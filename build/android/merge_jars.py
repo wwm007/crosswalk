@@ -40,6 +40,7 @@ JAR_ENTRY_WHITELIST = (
   'org/chromium/*.class',
   'org/xwalk/*.class',
   'com/tenta/*.class',
+  'androidNNN/support/*.class',
 )
 
 # These are the JAR files we are known to skip because they contain classes in
@@ -109,7 +110,7 @@ def main():
   options = parser.parse_args(build_utils.ExpandFileArgs(sys.argv[1:]))
   jars = []
   for j in options.jars:
-    jars.extend(build_utils.ParseGypList(j))
+    jars.extend(build_utils.ParseGnList(j))
   options.jars = jars
 
   if options.validate_skipped_jars_list:
@@ -140,7 +141,9 @@ def main():
       # another package with one of these non-allowed namespaces (see
       # XWALK-5092, XWALK-6597).
       if not IsMergeableJar(jar_file):
+        print('NOT MergeableJar %s' %(jar_file))
         continue
+      print('Merge jar %s' %(jar_file))
       build_utils.ExtractAll(jar_file, path=temp_dir, pattern='*.class')
     jar.JarDirectory(temp_dir, options.output_jar)
 

@@ -48,8 +48,6 @@ import android.view.View;
 import android.webkit.ValueCallback;
 import android.widget.FrameLayout;
 
-import com.tenta.fs.ACancellableProgress;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -270,6 +268,12 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
      */
     @XWalkAPI
     public static final int RELOAD_IGNORE_CACHE = 1;
+    
+    /**
+     * Reload to refresh content
+     */
+    @XWalkAPI
+    public static final int RELOAD_TO_REFRESH = 2;
     /**
      * SurfaceView is the default compositing surface which has a bit performance advantage, such as
      * it has less latency and uses less memory.
@@ -739,6 +743,26 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
         return mContent.getNavigationHistory();
     }
 
+
+    @XWalkAPI
+    public int getLastCommittedEntryIndex() {
+        if (mContent == null)
+            return -1;
+        checkThreadSafety();
+        return mContent.getLastCommittedEntryIndex();
+        
+    }
+    
+
+    @XWalkAPI
+    public int getPendingEntryIndex() {
+        if (mContent == null)
+            return -1;
+        checkThreadSafety();
+        return mContent.getPendingEntryIndex();
+        
+    }
+    
     /**
      * Injects the supplied Java object into this XWalkViewInternal. Each method defined in the
      * class of the object should be marked with {@link JavascriptInterface} if it's called by
@@ -1027,13 +1051,13 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
      * 
      * @return
      */
-    @XWalkAPI
+    //@XWalkAPI
     public int getMetaFsError() {
         if (mContent == null) {
             return -6; //ERR_INVALID_POINTER
         }
         
-        return mContent.getMetaFsError();
+        return -6;
     }
     
     /**
@@ -1261,13 +1285,7 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
         mContent.captureBitmapAsync(callback);
     }
 
-    /**
-     * Tenta extension
-     * 
-     * @param scale
-     * @param srcRect
-     * @param callback
-     */
+
     @XWalkAPI
     public void captureBitmapWithParams(float scale, Rect srcRect,
             XWalkGetBitmapCallbackInternal callback) {
@@ -1544,13 +1562,13 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
      * @param onTop true for on top.
      * @since 5.0
      */
-    @XWalkAPI
+/*    @XWalkAPI
     public void setZOrderOnTop(boolean onTop) {
         if (mContent == null)
             return;
         mContent.setZOrderOnTop(onTop);
     }
-
+*/
     /**
      * Removes the autocomplete popup from the currently focused form field, if present. Note this
      * only affects the display of the autocomplete popup, it does not remove any saved form data

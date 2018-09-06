@@ -15,7 +15,8 @@
 #include "content/public/browser/browser_ppapi_host.h"
 #include "content/public/browser/child_process_data.h"
 #include "content/public/browser/client_certificate_delegate.h"
-#include "content/public/browser/geolocation_delegate.h"
+#include "device/geolocation/geolocation_delegate.h"
+#include "device/geolocation/geolocation_provider.h"
 #include "content/public/browser/presentation_service_delegate.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
@@ -25,6 +26,7 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/content_descriptors.h"
 #include "content/public/common/main_function_params.h"
+#include "content/public/common/web_preferences.h"
 #include "gin/v8_initializer.h"
 #include "gin/public/isolate_holder.h"
 #include "net/ssl/ssl_info.h"
@@ -46,6 +48,7 @@
 #include "xwalk/runtime/browser/xwalk_runner.h"
 #include "xwalk/runtime/common/xwalk_paths.h"
 #include "xwalk/runtime/common/xwalk_switches.h"
+#include "xwalk/runtime/browser/devtools/xwalk_devtools_manager_delegate.h"
 
 #if !defined(DISABLE_NACL)
 #include "components/nacl/browser/nacl_browser.h"
@@ -94,13 +97,13 @@ namespace {
 XWalkContentBrowserClient* g_browser_client = nullptr;
 
 // A provider of services for Geolocation.
-class XWalkGeolocationDelegate : public content::GeolocationDelegate {
+class XWalkGeolocationDelegate : public device::GeolocationDelegate {
  public:
   explicit XWalkGeolocationDelegate(net::URLRequestContextGetter* request_context)
       : request_context_(request_context) {}
 
-  content::AccessTokenStore* CreateAccessTokenStore() final {
-    return new XWalkAccessTokenStore(request_context_);
+  scoped_refptr<device::AccessTokenStore> CreateAccessTokenStore() final {
+    return scoped_refptr<device::AccessTokenStore>( new XWalkAccessTokenStore(request_context_));
   }
 
  private:
@@ -132,8 +135,51 @@ XWalkContentBrowserClient::~XWalkContentBrowserClient() {
   g_browser_client = nullptr;
 }
 
+/**
+ * iotto
+ */
+void XWalkContentBrowserClient::OverrideWebkitPrefs(content::RenderViewHost* render_view_host,
+                                   content::WebPreferences* prefs) {
+
+  LOG(INFO) << "webPref default_minimum_page_scale_factor=" << prefs->default_minimum_page_scale_factor;
+  LOG(INFO) << "webPref default_maximum_page_scale_factor=" << prefs->default_maximum_page_scale_factor;
+  LOG(INFO) << "webPref use_wide_viewport=" << prefs->use_wide_viewport;
+  LOG(INFO) << "webPref wide_viewport_quirk=" << prefs->wide_viewport_quirk;
+  LOG(INFO) << "webPref viewport_meta_layout_size_quirk=" << prefs->viewport_meta_layout_size_quirk;
+  LOG(INFO) << "webPref viewport_meta_non_user_scalable_quirk=" << prefs->viewport_meta_non_user_scalable_quirk;
+  LOG(INFO) << "webPref report_screen_size_in_physical_pixels_quirk=" << prefs->report_screen_size_in_physical_pixels_quirk;
+  LOG(INFO) << "webPref force_enable_zoom=" << prefs->force_enable_zoom;
+  LOG(INFO) << "webPref device_scale_adjustment=" << prefs->device_scale_adjustment;
+  LOG(INFO) << "webPref font_scale_factor=" << prefs->font_scale_factor;
+  LOG(INFO) << "webPref text_autosizing_enabled=" << prefs->text_autosizing_enabled;
+
+  LOG(INFO) << "webPref default_font_size=" << prefs->default_font_size;
+  LOG(INFO) << "webPref default_fixed_font_size=" << prefs->default_fixed_font_size;
+  LOG(INFO) << "webPref minimum_font_size=" << prefs->minimum_font_size;
+  LOG(INFO) << "webPref minimum_logical_font_size=" << prefs->minimum_logical_font_size;
+  LOG(INFO) << "webPref javascript_can_access_clipboard=" << prefs->javascript_can_access_clipboard;
+  LOG(INFO) << "webPref number_of_cpu_cores=" << prefs->number_of_cpu_cores;
+  LOG(INFO) << "webPref viewport_enabled=" << prefs->viewport_enabled;
+  LOG(INFO) << "webPref shrinks_viewport_contents_to_fit=" << prefs->shrinks_viewport_contents_to_fit;
+  LOG(INFO) << "webPref viewport_style=" << static_cast<int>(prefs->viewport_style);
+  LOG(INFO) << "webPref initialize_at_minimum_page_scale=" << prefs->initialize_at_minimum_page_scale;
+  LOG(INFO) << "webPref inert_visual_viewport=" << prefs->inert_visual_viewport;
+
+  LOG(INFO) << "webPref double_tap_to_zoom_enabled=" << prefs->double_tap_to_zoom_enabled;
+  LOG(INFO) << "webPref support_deprecated_target_density_dpi=" << prefs->support_deprecated_target_density_dpi;
+  LOG(INFO) << "webPref use_legacy_background_size_shorthand_behavior=" << prefs->use_legacy_background_size_shorthand_behavior;
+
+  LOG(INFO) << "webPref clobber_user_agent_initial_scale_quirk=" << prefs->clobber_user_agent_initial_scale_quirk;
+  LOG(INFO) << "webPref cookie_enabled=" << prefs->cookie_enabled;
+  LOG(INFO) << "webPref progress_bar_completion=" << static_cast<int>(prefs->progress_bar_completion);
+  LOG(INFO) << "webPref viewport_meta_enabled=" << prefs->viewport_meta_enabled;
+
+  prefs->viewport_meta_enabled = true;
+}
+
 content::BrowserMainParts* XWalkContentBrowserClient::CreateBrowserMainParts(
     const content::MainFunctionParams& parameters) {
+  LOG(INFO) << "XWalkContentBrowserClient::CreateBrowserMainParts";
 #if defined(OS_MACOSX)
   main_parts_ = new XWalkBrowserMainPartsMac(parameters);
 #elif defined(OS_ANDROID)
@@ -142,6 +188,12 @@ content::BrowserMainParts* XWalkContentBrowserClient::CreateBrowserMainParts(
   main_parts_ = new XWalkBrowserMainParts(parameters);
 #endif
 
+  LOG(INFO) << "XWalkContentBrowserClient::CreateBrowserMainParts instance=" << reinterpret_cast<intptr_t>(main_parts_);
+  // TODO(iotto) see how and when this needs to be initialized
+/*  device::GeolocationProvider::SetGeolocationDelegate(
+      new XWalkGeolocationDelegate(
+      xwalk_runner_->browser_context()->url_request_getter()));
+*/
   return main_parts_;
 }
 
@@ -166,12 +218,6 @@ void XWalkContentBrowserClient::AppendExtraCommandLineSwitches(
 content::QuotaPermissionContext*
 XWalkContentBrowserClient::CreateQuotaPermissionContext() {
   return new RuntimeQuotaPermissionContext();
-}
-
-content::GeolocationDelegate*
-XWalkContentBrowserClient::CreateGeolocationDelegate() {
-  return new XWalkGeolocationDelegate(
-      xwalk_runner_->browser_context()->url_request_getter());
 }
 
 content::WebContentsViewDelegate*
@@ -278,22 +324,20 @@ void XWalkContentBrowserClient::AllowCertificateError(
     bool overridable,
     bool strict_enforcement,
     bool expired_previous_decision,
-    const base::Callback<void(bool)>& callback, // NOLINT
-    content::CertificateRequestResultType* result) {
+    const base::Callback<void(content::CertificateRequestResultType)>& callback) {
   // Currently only Android handles it.
   // TODO(yongsheng): applies it for other platforms?
 #if defined(OS_ANDROID)
   XWalkContentsClientBridgeBase* client =
       XWalkContentsClientBridgeBase::FromWebContents(web_contents);
-  bool cancel_request = true;
+//  bool cancel_request = true;
   if (client)
     client->AllowCertificateError(cert_error,
                                   ssl_info.cert.get(),
                                   request_url,
-                                  callback,
-                                  &cancel_request);
-  if (cancel_request)
-    *result = content::CERTIFICATE_REQUEST_RESULT_TYPE_DENY;
+                                  callback);
+//  if (cancel_request)
+//    *result = content::CERTIFICATE_REQUEST_RESULT_TYPE_DENY;
 #else
   DCHECK(web_contents);
   // The interstitial page shown is responsible for destroying
@@ -408,8 +452,13 @@ void XWalkContentBrowserClient::GetAdditionalAllowedSchemesForFileSystem(
 #endif
 }
 
-content::PresentationServiceDelegate* XWalkContentBrowserClient::
-    GetPresentationServiceDelegate(content::WebContents* web_contents) {
+content::DevToolsManagerDelegate* 
+XWalkContentBrowserClient::GetDevToolsManagerDelegate() {
+  return new XWalkDevToolsManagerDelegate(xwalk_runner_->browser_context());
+}
+
+content::ControllerPresentationServiceDelegate* XWalkContentBrowserClient::
+    GetControllerPresentationServiceDelegate(content::WebContents* web_contents) {
 #if defined(OS_WIN)
   return XWalkPresentationServiceDelegateWin::
       GetOrCreateForWebContents(web_contents);
@@ -423,17 +472,17 @@ content::PresentationServiceDelegate* XWalkContentBrowserClient::
 
 std::string XWalkContentBrowserClient::GetApplicationLocale() {
 #if defined(OS_ANDROID)
-  return base::android::GetDefaultLocale();
+  return base::android::GetDefaultLocaleString();
 #else
   return content::ContentBrowserClient::GetApplicationLocale();
 #endif
 }
 
 #if defined(OS_ANDROID)
-ScopedVector<content::NavigationThrottle>
+std::vector<std::unique_ptr<content::NavigationThrottle>>
 XWalkContentBrowserClient::CreateThrottlesForNavigation(
     content::NavigationHandle* navigation_handle) {
-  ScopedVector<content::NavigationThrottle> throttles;
+  std::vector<std::unique_ptr<content::NavigationThrottle>> throttles;
   // We allow intercepting only navigations within main frames. This
   // is used to post onPageStarted. We handle shouldOverrideUrlLoading
   // via a sync IPC.

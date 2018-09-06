@@ -328,8 +328,8 @@ source_set("xwalk_runtime") {
     "runtime/renderer/xwalk_content_renderer_client.h",
     "runtime/net/tenta_network_change_notifier_factory.cc",
     "runtime/net/tenta_network_change_notifier_factory.h",
-    "runtime/browser/android/tenta/dummy_native_test.cc",
-    "runtime/browser/android/tenta/dummy_native_test.h",
+    "//android_webview/browser/renderer_host/auto_login_parser.cc",
+    "//android_webview/browser/renderer_host/auto_login_parser.h",
   ]
   if (!is_android) {
     sources += [
@@ -373,11 +373,12 @@ source_set("xwalk_runtime") {
     "//base:i18n",
     "//base/third_party/dynamic_annotations",
     "//cc",
+    "//components/autofill/android:autofill_java",
     "//components/autofill/content/browser",
     "//components/autofill/content/renderer",
     "//components/autofill/core/browser",
     "//components/cdm/renderer",
-    "//components/devtools_http_handler",
+#    "//components/devtools_http_handler",
     "//components/resources:components_resources",
     "//components/strings",
     "//components/url_formatter",
@@ -390,6 +391,7 @@ source_set("xwalk_runtime") {
     "//content/public/child",
     "//content/public/common",
     "//content/public/utility",
+    "//content/public/android:content_java",
     "//gin",
     "//ipc",
     "//media",
@@ -418,8 +420,8 @@ source_set("xwalk_runtime") {
     "//xwalk/sysapps",
     "//xwalk/sysapps:xwalk_sysapps_resources",
 #    "//xwalk/third_party/tenta/file_blocks",
-    "//xwalk/third_party/tenta/meta_fs",
-    "//xwalk/third_party/tenta/chromium_cache",
+#    "//xwalk/third_party/tenta/meta_fs",
+#    "//xwalk/third_party/tenta/chromium_cache",
   ]
 
     # TODO remove  

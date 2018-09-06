@@ -425,6 +425,7 @@ public class XWalkUpdater {
         }
 
         String packageName = XWalkLibraryInterface.XWALK_CORE_PACKAGE;
+        packageName = mContext.getApplicationContext().getPackageName();
         Intent intent = new Intent(Intent.ACTION_VIEW);
         intent.setData(Uri.parse(ANDROID_MARKET_DETAILS + packageName));
         List<ResolveInfo> infos = mContext.getPackageManager().queryIntentActivities(

@@ -15,11 +15,11 @@
 #include "third_party/WebKit/public/platform/modules/permissions/permission_status.mojom.h"
 #include "xwalk/runtime/browser/android/find_helper.h"
 #include "xwalk/runtime/browser/android/renderer_host/xwalk_render_view_host_ext.h"
-#include "xwalk/third_party/tenta/meta_fs/jni/meta_virtual_file.h"
+//#include "xwalk/third_party/tenta/meta_fs/jni/meta_virtual_file.h"
 
 using base::android::JavaParamRef;
 using base::android::ScopedJavaLocalRef;
-using tenta::fs::MetaFile;
+//using tenta::fs::MetaFile;
 
 namespace content {
 class BrowserContext;
@@ -27,9 +27,9 @@ class WebContents;
 }
 
 namespace xwalk {
-namespace tenta {
-class FsDelegateSqlite;
-}
+//namespace tenta {
+//class FsDelegateSqlite;
+//}
 class XWalkAutofillManager;
 class XWalkWebContentsDelegate;
 class XWalkContentsClientBridge;
@@ -64,36 +64,7 @@ class XWalkContent : public FindHelper::Listener {
                                                          jobject obj);
   jboolean SetState(JNIEnv* env, jobject obj, jbyteArray state);
 
-  /******** Using Metafs **********/
-  //TODO make this private
-  int OpenHistoryFile(JNIEnv* env, const JavaParamRef<jstring>& id,
-                      const JavaParamRef<jstring>& key,
-                      std::shared_ptr<MetaFile>& out,
-                      int mode);
-
-  jint SaveOldHistory(JNIEnv* env, const JavaParamRef<jobject>& obj,
-                      const JavaParamRef<jbyteArray>& state,
-                      const JavaParamRef<jstring>& id,
-                      const JavaParamRef<jstring>& key);
-
-  jint SaveHistory(JNIEnv* env, const JavaParamRef<jobject>& obj,
-                   const JavaParamRef<jstring>& id,
-                   const JavaParamRef<jstring>& key);
-
-  jint RestoreHistory(JNIEnv* env, const JavaParamRef<jobject>& obj,
-                      const JavaParamRef<jstring>& id,
-                      const JavaParamRef<jstring>& key);
-
-  jint NukeHistory(JNIEnv* env, const JavaParamRef<jobject>& obj,
-                   const JavaParamRef<jstring>& id,
-                   const JavaParamRef<jstring>& key);
-
-  jint ReKeyHistory(JNIEnv* env, const JavaParamRef<jobject>& obj,
-                    const JavaParamRef<jstring>& oldKey,
-                    const JavaParamRef<jstring>& newKey);
-
-  /******** End Metafs **********/
-
+ 
 //  jboolean PushStateWitkKey(JNIEnv* env, jobject obj,
 //                            const JavaParamRef<jbyteArray>& state,
 //                            jstring id,

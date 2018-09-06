@@ -6,7 +6,7 @@
         Crosswalk Project Service Not Found
       </message>
       <message desc="Startup Not Found Message [CHAR-LIMIT=100]" name="IDS_STARTUP_NOT_FOUND_MESSAGE">
-        APP_NAME requires the Crosswalk Project Service to work. Please install it from the app store, then restart APP_NAME.
+        APP_NAME requires correct apk to work. Please install it from the app store, then restart APP_NAME.
       </message>
       <message desc="Startup Older Version Title [CHAR-LIMIT=100]" name="IDS_STARTUP_OLDER_VERSION_TITLE">
         New Crosswalk Project Service Required
@@ -33,7 +33,7 @@
         The integrity of the Crosswalk Project Service cannot be verified. Please uninstall it and restart APP_NAME.
       </message>
       <message desc="Crosswalk Install Title [CHAR-LIMIT=100]" name="IDS_CROSSWALK_INSTALL_TITLE">
-        Crosswalk Project Install
+        Install
       </message>
       <message desc="Download Failed Message [CHAR-LIMIT=100]" name="IDS_DOWNLOAD_FAILED_MESSAGE">
         Download failed.
@@ -54,7 +54,7 @@
         Google Play Store
       </message>
       <message desc="Label of Get Crosswalk [CHAR-LIMIT=100]" name="IDS_XWALK_GET_CROSSWALK">
-        Get Crosswalk
+        Get
       </message>
       <message desc="Label of Cancel [CHAR-LIMIT=100]" name="IDS_XWALK_CANCEL">
         Cancel

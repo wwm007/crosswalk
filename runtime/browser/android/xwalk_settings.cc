@@ -84,6 +84,8 @@ struct XWalkSettings::FieldIds {
         GetFieldID(env, clazz, "mQuirksModeEnabled", "Z");
     initialize_at_minimum_page_scale =
         GetFieldID(env, clazz, "mLoadWithOverviewMode", "Z");
+    viewport_meta_enabled =
+        GetFieldID(env, clazz, "mViewPortMetaEnabled", "Z");
   }
 
   // Field ids
@@ -106,6 +108,7 @@ struct XWalkSettings::FieldIds {
   jfieldID spatial_navigation_enabled;
   jfieldID quirks_mode_enabled;
   jfieldID initialize_at_minimum_page_scale;
+  jfieldID viewport_meta_enabled;
 };
 
 XWalkSettings::XWalkSettings(JNIEnv* env,
@@ -183,6 +186,8 @@ void XWalkSettings::UpdateWebkitPreferences(JNIEnv* env, jobject obj) {
   if (!render_view_host) return;
   content::WebPreferences prefs = render_view_host->GetWebkitPreferences();
 
+  LOG(INFO) << "XWalkSettings::UpdateWebkitPreferences";
+
   prefs.allow_scripts_to_close_windows =
       env->GetBooleanField(obj, field_ids_->allow_scripts_to_close_windows);
 
@@ -238,8 +243,6 @@ void XWalkSettings::UpdateWebkitPreferences(JNIEnv* env, jobject obj) {
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   prefs.allow_running_insecure_content =
       command_line->HasSwitch(switches::kAllowRunningInsecureContent);
-  prefs.allow_displaying_insecure_content =
-      !command_line->HasSwitch(switches::kNoDisplayingInsecureContent);
 
   ScopedJavaLocalRef<jstring> str;
   str.Reset(
@@ -275,7 +278,7 @@ void XWalkSettings::UpdateWebkitPreferences(JNIEnv* env, jobject obj) {
   prefs.clobber_user_agent_initial_scale_quirk = support_quirks;
 
   prefs.wide_viewport_quirk = true;
-  prefs.viewport_meta_enabled = true;
+  prefs.viewport_meta_enabled = env->GetBooleanField(obj, field_ids_->viewport_meta_enabled);
 
   render_view_host->UpdateWebkitPreferences(prefs);
 }
@@ -290,6 +293,7 @@ void XWalkSettings::UpdateFormDataPreferences(JNIEnv* env, jobject obj) {
 
 void XWalkSettings::RenderViewCreated(
     content::RenderViewHost* render_view_host) {
+  LOG(INFO) << "XWalkSettings::RenderViewCreated";
   // A single WebContents can normally have 0 to many RenderViewHost instances
   // associated with it.
   // This is important since there is only one RenderViewHostExt instance per
@@ -301,6 +305,11 @@ void XWalkSettings::RenderViewCreated(
   // (since we only ever go from 0 to 1 RVH instances) and hence the DCHECK.
   DCHECK(web_contents()->GetRenderViewHost() == render_view_host);
 
+  UpdateEverything();
+}
+
+void XWalkSettings::RenderFrameForInterstitialPageCreated(content::RenderFrameHost* render_frame_host) {
+  LOG(INFO) << "XWalkSettings::RenderFrameForInterstitialPageCreated";
   UpdateEverything();
 }
 

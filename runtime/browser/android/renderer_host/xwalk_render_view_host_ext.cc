@@ -9,9 +9,11 @@
 #include "base/logging.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
+#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/user_metrics.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/frame_navigate_params.h"
+#include "content/public/browser/navigation_handle.h"
 #include "xwalk/runtime/browser/android/xwalk_contents_client_bridge.h"
 #include "xwalk/runtime/browser/xwalk_browser_context.h"
 #include "xwalk/runtime/common/android/xwalk_render_view_messages.h"
@@ -35,7 +37,7 @@ void XWalkRenderViewHostExt::DocumentHasImages(DocumentHasImagesResult result) {
   static int next_id = 1;
   int this_id = next_id++;
   pending_document_has_images_requests_[this_id] = result;
-  Send(new XWalkViewMsg_DocumentHasImages(web_contents()->GetRoutingID(),
+  Send(new XWalkViewMsg_DocumentHasImages(web_contents()->GetRenderViewHost()->GetRoutingID(),
                                        this_id));
 }
 
@@ -56,7 +58,7 @@ void XWalkRenderViewHostExt::RequestNewHitTestDataAt(
     const gfx::PointF& touch_center,
     const gfx::SizeF& touch_area) {
   DCHECK(CalledOnValidThread());
-  Send(new XWalkViewMsg_DoHitTest(web_contents()->GetRoutingID(),
+  Send(new XWalkViewMsg_DoHitTest(web_contents()->GetRenderViewHost()->GetRoutingID(),
                                touch_center,
                                touch_area));
 }
@@ -68,19 +70,27 @@ const XWalkHitTestData& XWalkRenderViewHostExt::GetLastHitTestData() const {
 
 void XWalkRenderViewHostExt::SetTextZoomLevel(double level) {
   DCHECK(CalledOnValidThread());
+  LOG(INFO) << "SetTextZoomLevel=" << level;
   Send(new XWalkViewMsg_SetTextZoomLevel(
-      web_contents()->GetRoutingID(), level));
+      web_contents()->GetRenderViewHost()->GetRoutingID(), level));
 }
 
 void XWalkRenderViewHostExt::ResetScrollAndScaleState() {
   DCHECK(CalledOnValidThread());
+
+  LOG(INFO) << "ResetScrollAndScaleState";
   Send(new XWalkViewMsg_ResetScrollAndScaleState(
-      web_contents()->GetRoutingID()));
+      web_contents()->GetMainFrame()->GetRoutingID()));
+//  Send(new XWalkViewMsg_ResetScrollAndScaleState(
+//      web_contents()->GetRenderViewHost()->GetRoutingID()));
 }
 
 void XWalkRenderViewHostExt::SetInitialPageScale(double page_scale_factor) {
   DCHECK(CalledOnValidThread());
-  Send(new XWalkViewMsg_SetInitialPageScale(web_contents()->GetRoutingID(),
+  LOG(INFO) << "SetInitialPageScale=" << page_scale_factor;
+//  Send(new XWalkViewMsg_SetInitialPageScale(web_contents()->GetMainFrame()->GetRoutingID(),
+//                                         page_scale_factor));
+  Send(new XWalkViewMsg_SetInitialPageScale(web_contents()->GetRenderViewHost()->GetRoutingID(),
                                          page_scale_factor));
 }
 
@@ -107,19 +117,23 @@ void XWalkRenderViewHostExt::RenderProcessGone(base::TerminationStatus status) {
   }
 }
 
-void XWalkRenderViewHostExt::DidNavigateAnyFrame(
+void XWalkRenderViewHostExt::DidFinishNavigation(content::NavigationHandle* navigation_handle) {
+/*void XWalkRenderViewHostExt::DidNavigateAnyFrame(
     content::RenderFrameHost* render_frame_host,
     const content::LoadCommittedDetails& details,
     const content::FrameNavigateParams& params) {
+*/
   DCHECK(CalledOnValidThread());
-
-  XWalkBrowserContext::FromWebContents(web_contents())
+/*  XWalkBrowserContext::FromWebContents(web_contents())
       ->AddVisitedURLs(params.redirects);
+*/
+  XWalkBrowserContext::FromWebContents(web_contents())->AddVisitedURLs(navigation_handle->GetRedirectChain());
 }
 
 void XWalkRenderViewHostExt::OnPageScaleFactorChanged(float page_scale_factor) {
   XWalkContentsClientBridgeBase* client_bridge =
       XWalkContentsClientBridgeBase::FromWebContents(web_contents());
+  LOG(INFO) << "OnPageScaleFactorChanged=" << page_scale_factor;
   if (client_bridge != NULL)
     client_bridge->OnWebLayoutPageScaleFactorChanged(page_scale_factor);
 }
@@ -172,13 +186,19 @@ void XWalkRenderViewHostExt::SetOriginAccessWhitelist(
 
 void XWalkRenderViewHostExt::SetBackgroundColor(SkColor c) {
   DCHECK(CalledOnValidThread());
-  Send(new XWalkViewMsg_SetBackgroundColor(web_contents()->GetRoutingID(), c));
+  Send(new XWalkViewMsg_SetBackgroundColor(web_contents()->GetMainFrame()->GetRoutingID(), c));
+//  Send(new XWalkViewMsg_SetBackgroundColor(web_contents()->GetRenderViewHost()->GetRoutingID(), c));
 }
 
 void XWalkRenderViewHostExt::SetTextZoomFactor(float factor) {
   DCHECK(CalledOnValidThread());
-  Send(new XWalkViewMsg_SetTextZoomFactor(web_contents()->GetRoutingID(),
+  LOG(INFO) << "SetTextZoomFactor RenderViewHost()->GetRoutingID=" << web_contents()->GetRenderViewHost()->GetRoutingID();
+  LOG(INFO) << "SetTextZoomFactor MainFrame()->GetRoutingID()=" << web_contents()->GetMainFrame()->GetRoutingID();
+
+  Send(new XWalkViewMsg_SetTextZoomFactor(web_contents()->GetMainFrame()->GetRoutingID(),
       factor));
+//  Send(new XWalkViewMsg_SetTextZoomFactor(web_contents()->GetRenderViewHost()->GetRoutingID(),
+//      factor));
 }
 
 }  // namespace xwalk

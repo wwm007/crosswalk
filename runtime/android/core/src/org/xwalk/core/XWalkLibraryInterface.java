@@ -53,8 +53,8 @@ interface XWalkLibraryInterface {
      */
     public static final int STATUS_RUNTIME_MISMATCH = 8;
 
-    public static final String XWALK_CORE_PACKAGE = "org.xwalk.core";
-    public static final String XWALK_CORE64_PACKAGE = "org.xwalk.core64";
-    public static final String XWALK_CORE_IA_PACKAGE = "org.xwalk.core.ia";
-    public static final String XWALK_CORE64_IA_PACKAGE = "org.xwalk.core64.ia";
+    public static final String XWALK_CORE_PACKAGE = "com.your.packagename";
+    public static final String XWALK_CORE64_PACKAGE = XWALK_CORE_PACKAGE;
+    public static final String XWALK_CORE_IA_PACKAGE = XWALK_CORE_PACKAGE;
+    public static final String XWALK_CORE64_IA_PACKAGE = XWALK_CORE_PACKAGE;
 }

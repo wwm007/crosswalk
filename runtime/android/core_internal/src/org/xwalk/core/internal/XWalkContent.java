@@ -28,7 +28,7 @@ import android.view.inputmethod.InputConnection;
 import android.webkit.ValueCallback;
 import android.widget.FrameLayout;
 
-import com.tenta.fs.MetaErrors;
+//import com.tenta.fs.MetaErrors;
 
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.annotations.CalledByNative;
@@ -38,18 +38,18 @@ import org.chromium.content.browser.ContentViewCore;
 import org.chromium.content.browser.ContentViewRenderView;
 import org.chromium.content.browser.ContentViewRenderView.CompositingSurfaceType;
 import org.chromium.content.browser.ContentViewStatics;
-import org.chromium.content.common.CleanupReference;
 import org.chromium.content_public.browser.ContentBitmapCallback;
 import org.chromium.content_public.browser.JavaScriptCallback;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.browser.NavigationController;
+import org.chromium.content_public.browser.NavigationEntry;
 import org.chromium.content_public.browser.NavigationHistory;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.navigation_controller.UserAgentOverrideOption;
 import org.chromium.media.MediaPlayerBridge;
 import org.chromium.ui.base.ActivityWindowAndroid;
+import org.chromium.ui.base.ViewAndroidDelegate;
 import org.chromium.ui.base.WindowAndroid;
-import org.chromium.ui.gfx.DeviceDisplayInfo;
 import org.json.JSONArray;
 
 import java.io.IOException;
@@ -128,7 +128,7 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
 
     // Reference to the active mNativeContent pointer while it is active use
     // (ie before it is destroyed).
-    private CleanupReference mCleanupReference;
+    private XWalkCleanupReference mXWalkCleanupReference;
 
     public XWalkContent(Context context, String animatable, XWalkViewInternal xwView) {
         // Initialize the WebContensDelegate.
@@ -158,6 +158,7 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
         mGetBitmapCallback = new ContentBitmapCallback() {
             @Override
             public void onFinishGetBitmap(Bitmap bitmap, int response) {
+                Log.d("iotto", "onFinishGetBitmap " + response);
                 if (mXWalkGetBitmapCallbackInternal == null)
                     return;
                 mXWalkGetBitmapCallbackInternal.onFinishGetBitmap(bitmap, response);
@@ -168,9 +169,11 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
     public void captureBitmapAsync(XWalkGetBitmapCallbackInternal callback) {
         if (mNativeContent == 0)
             return;
+        Log.d("iotto", "captureBitmapAsync");
         mXWalkGetBitmapCallbackInternal = callback;
-        mWebContents.getContentBitmapAsync(Bitmap.Config.ARGB_8888, 1.0f, new Rect(),
-                mGetBitmapCallback);
+        mWebContents.getContentBitmapAsync(0, 0, mGetBitmapCallback);
+//        mWebContents.getContentBitmapAsync(Bitmap.Config.ARGB_8888, 1.0f, new Rect(),
+//                mGetBitmapCallback);
     }
 
     public void captureBitmapWithParams(Bitmap.Config config, float scale, Rect srcRect,
@@ -178,8 +181,9 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
         if (mNativeContent == 0)
             return;
         mXWalkGetBitmapCallbackInternal = callback;
-        mWebContents.getContentBitmapAsync(config, scale, srcRect,
-                mGetBitmapCallback);
+        mWebContents.getContentBitmapAsync(0, 0, mGetBitmapCallback);
+//        mWebContents.getContentBitmapAsync(config, scale, srcRect,
+//                mGetBitmapCallback);
     }
 
     private void setNativeContent(long newNativeContent, String animatable) {
@@ -188,7 +192,7 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
             mContentViewCore = null;
         }
 
-        assert mNativeContent == 0 && mCleanupReference == null && mContentViewCore == null;
+        assert mNativeContent == 0 && mXWalkCleanupReference == null && mContentViewCore == null;
 
         // Initialize ContentViewRenderView
         if (animatable == null)
@@ -196,10 +200,11 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
                     .getValue(XWalkPreferencesInternal.ANIMATABLE_XWALK_VIEW);
         else
             mAnimated = animatable.equalsIgnoreCase("true");
+        mAnimated = false;
         CompositingSurfaceType surfaceType = mAnimated ? CompositingSurfaceType.TEXTURE_VIEW
                 : CompositingSurfaceType.SURFACE_VIEW;
         Log.d(TAG, "CompositingSurfaceType is " + (mAnimated ? "TextureView" : "SurfaceView"));
-        mContentViewRenderView = new ContentViewRenderView(mViewContext, surfaceType) {
+        mContentViewRenderView = new ContentViewRenderView(mViewContext, CompositingSurfaceType.SURFACE_VIEW/*surfaceType*/) {
             protected void onReadyToRender() {
                 // Anything depending on the underlying Surface readiness should
                 // be placed here.
@@ -217,15 +222,20 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
         // The native side object has been bound to this java instance, so now
         // is the time to
         // bind all the native->java relationships.
-        mCleanupReference = new CleanupReference(this, new DestroyRunnable(mNativeContent));
+        mXWalkCleanupReference = new XWalkCleanupReference(this, new DestroyRunnable(mNativeContent));
 
         mWebContents = nativeGetWebContents(mNativeContent);
 
         // Initialize ContentView.
-        mContentViewCore = new ContentViewCore(mViewContext);
+        mContentViewCore = new ContentViewCore(mViewContext, "Crosswalk");
         mContentView = XWalkContentView.createContentView(mViewContext, mContentViewCore,
                 mXWalkView);
-        mContentViewCore.initialize(mContentView, mContentView, mWebContents, mWindow);
+        // TODO(iotto) create propper delegate
+        mContentViewCore.initialize(ViewAndroidDelegate.createBasicDelegate(mContentView), 
+                 mContentView, mWebContents, mWindow);
+        
+        // iotto: returnes nativeGetWebContentsAndroid
+        mWebContents = mContentViewCore.getWebContents();
         mNavigationController = mWebContents.getNavigationController();
         mXWalkView.addView(mContentView,
                 new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
@@ -252,11 +262,15 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
         mSettings.setAllowFileAccessFromFileURLs(true);
 
         // Set DIP scale.
-        mDIPScale = DeviceDisplayInfo.create(mViewContext).getDIPScale();
+        WindowAndroid windowAndroid = mContentViewCore.getWindowAndroid();
+
+        mDIPScale = windowAndroid.getDisplay().getDipScale();
+//DeviceDisplayInfo.create(mViewContext).getDIPScale();
+        
         mContentsClientBridge.setDIPScale(mDIPScale);
         mSettings.setDIPScale(mDIPScale);
 
-        String language = Locale.getDefault().toString().replaceAll("_", "-").toLowerCase();
+        String language = Locale.getDefault().toString().replaceAll("_", "-").toLowerCase(Locale.getDefault());
         if (language.isEmpty())
             language = "en";
         mSettings.setAcceptLanguages(language);
@@ -391,6 +405,10 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
             return;
 
         switch (mode) {
+//TODO(iotto) remove duplicate mode
+            case XWalkViewInternal.RELOAD_TO_REFRESH:
+                mNavigationController.reload(true);
+                break;
             case XWalkViewInternal.RELOAD_IGNORE_CACHE:
                 mNavigationController.reloadBypassingCache(true);
                 break;
@@ -653,7 +671,8 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
             setOverlayVideoMode(true);
             mContentViewCore.setBackgroundOpaque(false);
         }
-        mContentViewCore.setBackgroundColor(color);
+// TODO(iotto) follow into 
+//        mContentViewCore.setBackgroundColor(color);
         mContentViewRenderView.setSurfaceViewBackgroundColor(color);
         nativeSetBackgroundColor(mNativeContent, color);
     }
@@ -741,6 +760,26 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
                 mNavigationController.getNavigationHistory());
     }
 
+    public int getLastCommittedEntryIndex() {
+        if (mNativeContent == 0)
+            return -1;
+        
+        return mNavigationController.getLastCommittedEntryIndex();
+    }
+    
+    public int getPendingEntryIndex() {
+        if (mNativeContent == 0)
+            return -1;
+        
+        NavigationEntry pending = mNavigationController.getPendingEntry();
+        if ( pending == null ) {
+            return -1;
+        }
+        
+        return pending.getIndex();
+        
+    }
+    
     public static final String SAVE_RESTORE_STATE_KEY = "XWALKVIEW_STATE";
 
     /**
@@ -777,7 +816,7 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
         // already restored. See WebContentsImpl::UpdateTitleForEntry. So we
         // call the callback explicitly here.
         if (result)
-            mContentsClientBridge.onUpdateTitle(mWebContents.getTitle());
+            mContentsClientBridge.onTitleChanged(mWebContents.getTitle());
 
         return result ? getNavigationHistory() : null;
     }
@@ -787,9 +826,9 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
      * 
      * @return
      */
-    public int getMetaFsError() {
-        return metaFsError;
-    }
+   // public int getMetaFsError() {
+   //     return metaFsError;
+  //  }
 
     /**
      * Save current history in native db, using id and encryption key
@@ -800,14 +839,14 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
      */
     public XWalkNavigationHistoryInternal saveHistory(final String id, final String encKey) {
         if (mNativeContent == 0) {
-            metaFsError = -6; // ERR_INVALID_POINTER
+         //   metaFsError = -6; // ERR_INVALID_POINTER
             return null;
         }
 
-        metaFsError = nativeSaveHistory(mNativeContent, id, encKey);
-        if (metaFsError != MetaErrors.FS_OK) {
-            return null;
-        }
+      //  metaFsError = nativeSaveHistory(mNativeContent, id, encKey);
+       // if (metaFsError != MetaErrors.FS_OK) {
+        //    return null;
+       // }
 
         return getNavigationHistory();
     }
@@ -821,17 +860,17 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
      */
     public XWalkNavigationHistoryInternal restoreHistory(final String id, final String encKey) {
         if (mNativeContent == 0) {
-            metaFsError = -6; // ERR_INVALID_POINTER
+        //    metaFsError = -6; // ERR_INVALID_POINTER
             return null;
         }
 
         // return result ? getNavigationHistory() : null;
-        metaFsError = nativeRestoreHistory(mNativeContent, id, encKey);
-        if (metaFsError != MetaErrors.FS_OK) {
-            return null;
-        }
+       // metaFsError = nativeRestoreHistory(mNativeContent, id, encKey);
+       // if (metaFsError != MetaErrors.FS_OK) {
+       //     return null;
+       // }
 
-        mContentsClientBridge.onUpdateTitle(mWebContents.getTitle());
+        mContentsClientBridge.onTitleChanged(mWebContents.getTitle());
 
         return getNavigationHistory();
     }
@@ -848,18 +887,18 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
             final String encKey) {
 
         if (mNativeContent == 0) {
-            metaFsError = -6; // ERR_INVALID_POINTER
+           // metaFsError = -6; // ERR_INVALID_POINTER
             return null;
         }
         // return result ? getNavigationHistory() : null;
 
-        metaFsError = nativeSaveOldHistory(mNativeContent, state, id, encKey);
+     //   metaFsError = nativeSaveOldHistory(mNativeContent, state, id, encKey);s
 
-        if (metaFsError != MetaErrors.FS_OK) {
-            return null;
-        }
+      //  if (metaFsError != MetaErrors.FS_OK) {
+      //      return null;
+      //  }
 
-        mContentsClientBridge.onUpdateTitle(mWebContents.getTitle());
+        mContentsClientBridge.onTitleChanged(mWebContents.getTitle());
 
         return getNavigationHistory();
     }
@@ -873,29 +912,29 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
      */
     public XWalkNavigationHistoryInternal nukeHistory(final String id, final String encKey) {
         if (mNativeContent == 0) {
-            metaFsError = -6; // ERR_INVALID_POINTER
+          //  metaFsError = -6; // ERR_INVALID_POINTER
             return null;
         }
 
-        metaFsError = nativeNukeHistory(mNativeContent, id, encKey);
+    ////    metaFsError = nativeNukeHistory(mNativeContent, id, encKey);
 
-        if (metaFsError != MetaErrors.FS_OK) {
-            return null;
-        }
+      //  if (metaFsError != MetaErrors.FS_OK) {
+      //      return null;
+      //  }
 
         return getNavigationHistory();
     }
 
     public boolean rekeyHistory(final String oldKey, final String newKey) {
         if (mNativeContent == 0) {
-            metaFsError = -6; // ERR_INVALID_POINTER
+         //   metaFsError = -6; // ERR_INVALID_POINTER
             return false;
         }
 
-        metaFsError = nativeReKeyHistory(mNativeContent, oldKey, newKey);
-        if (metaFsError != MetaErrors.FS_OK) {
-            return false;
-        }
+      //  metaFsError = nativeReKeyHistory(mNativeContent, oldKey, newKey);
+     //   if (metaFsError != MetaErrors.FS_OK) {
+      //      return false;
+     //   }
 
         return true;
     }
@@ -997,11 +1036,11 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
         }
 
         // Destroy the native resources.
-        mCleanupReference.cleanupNow();
+        mXWalkCleanupReference.cleanupNow();
         mContentViewRenderView.destroy();
         mContentViewCore.destroy();
 
-        mCleanupReference = null;
+        mXWalkCleanupReference = null;
         mNativeContent = 0;
     }
 
@@ -1249,12 +1288,12 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
         }
     }
 
-    public void setZOrderOnTop(boolean onTop) {
+/*    public void setZOrderOnTop(boolean onTop) {
         if (mContentViewRenderView == null)
             return;
         mContentViewRenderView.setZOrderOnTop(onTop);
     }
-
+*/
     public boolean zoomIn() {
         if (mNativeContent == 0)
             return false;
@@ -1437,21 +1476,21 @@ class XWalkContent implements XWalkPreferencesInternal.KeyValueChangeListener {
     private native void nativeInvokeGeolocationCallback(long nativeXWalkContent, boolean value,
             String requestingFrame);
 
-    /****** MetaFS ********/
-    private native int nativeSaveOldHistory(long nativeXWalkContent, byte[] state, final String id,
-            final String key);
+    /*/****** MetaFS ********/
+    //private native int nativeSaveOldHistory(long nativeXWalkContent, byte[] state, final String id,
+    //        final String key);
 
-    private native int nativeSaveHistory(long nativeXWalkContent, String id, String key);
+    //private native int nativeSaveHistory(long nativeXWalkContent, String id, String key);
 
-    private native int nativeRestoreHistory(long nativeXWalkContent, String id,
-            String key);
+    //private native int nativeRestoreHistory(long nativeXWalkContent, String id,
+    //        String key);
 
-    private native int nativeNukeHistory(long nativeXWalkContent, String id, String key);
+    //private native int nativeNukeHistory(long nativeXWalkContent, String id, String key);
 
     /******* end MetaFs **********/
 
-    private native int nativeReKeyHistory(long nativeXWalkContent, String oldKey,
-            String newKey);
+    //private native int nativeReKeyHistory(long nativeXWalkContent, String oldKey,
+    //        String newKey);
 
     private native byte[] nativeGetState(long nativeXWalkContent);
 

@@ -12,6 +12,7 @@
 #include "content/public/browser/child_process_security_policy.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
+#include "content/public/browser/restore_type.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/page_state.h"
@@ -101,15 +102,13 @@ bool RestoreFromPickle(base::PickleIterator* iterator,
     entries.push_back(content::NavigationEntry::Create());
     if (!internal::RestoreNavigationEntryFromPickle(iterator, entries[i].get()))
       return false;
-
-    entries[i]->SetPageID(i);
   }
 
   // |web_contents| takes ownership of these entries after this call.
   content::NavigationController& controller = web_contents->GetController();
   controller.Restore(
       selected_entry,
-      content::NavigationController::RESTORE_LAST_SESSION_EXITED_CLEANLY,
+      content::RestoreType::LAST_SESSION_EXITED_CLEANLY,
       &entries);
   DCHECK_EQ(0u, entries.size());
 
@@ -189,6 +188,9 @@ bool WriteNavigationEntryToPickle(const content::NavigationEntry& entry,
   if (!pickle->WriteInt(entry.GetHttpStatusCode()))
     return false;
 
+  if (!pickle->WriteString(entry.GetExtraHeaders()))
+    return false;
+
   // Please update AW_STATE_VERSION if serialization format is changed.
 
   return true;
@@ -261,6 +263,9 @@ bool RestoreNavigationEntryFromPickle(base::PickleIterator* iterator,
     entry->SetBaseURLForDataURL(GURL(base_url_for_data_url));
   }
 
+  // TODO (iotto) missing data url
+  // entry->SetDataURLAsString(ref);
+
   {
     bool is_overriding_user_agent;
     if (!iterator->ReadBool(&is_overriding_user_agent))
@@ -282,6 +287,13 @@ bool RestoreNavigationEntryFromPickle(base::PickleIterator* iterator,
     entry->SetHttpStatusCode(http_status_code);
   }
 
+  {
+    string extra_headers;
+    if (!iterator->ReadString(&extra_headers))
+      return false;
+    if ( !extra_headers.empty())
+      entry->AddExtraHeaders(extra_headers);
+  }
   return true;
 }
 
