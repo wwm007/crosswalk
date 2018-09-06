@@ -1,3 +1,12 @@
+## Update: Crosswalk with chromium 58
+
+Docker image: docker pull ks32/crosswalk-build-tools
+
+Follow instructions at https://crosswalk-project.org/contribute/building_crosswalk/android_build.html <br>
+and <br>
+https://crosswalk-project.org/contribute/building_crosswalk/tracking_branches.html
+
+
 ## Introduction
 
 Crosswalk is an app runtime based on Chromium/Blink.
