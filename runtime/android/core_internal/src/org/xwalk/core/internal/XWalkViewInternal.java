@@ -48,7 +48,7 @@ import android.view.View;
 import android.webkit.ValueCallback;
 import android.widget.FrameLayout;
 
-import com.tenta.fs.ACancellableProgress;
+import com.tenta.fs.MetaErrors;
 
 import java.io.File;
 import java.io.IOException;
@@ -270,6 +270,12 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
      */
     @XWalkAPI
     public static final int RELOAD_IGNORE_CACHE = 1;
+
+    /**
+     * Reload to refresh content
+     */
+    @XWalkAPI
+    public static final int RELOAD_TO_REFRESH = 2;
     /**
      * SurfaceView is the default compositing surface which has a bit performance advantage, such as
      * it has less latency and uses less memory.
@@ -318,7 +324,7 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
         mContext = getContext();
 
         mXWalkHitTestResult = new XWalkHitTestResultInternal();
-        initXWalkContent(null);
+        initXWalkContent();
     }
 
     // A View is usually in edit mode when displayed within a developer tool, like Android Studio.
@@ -344,10 +350,7 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
             "                FrameLayout.LayoutParams.MATCH_PARENT));", "        removeViewAt(0);",
             "        new org.xwalk.core.extension.XWalkExternalExtensionManagerImpl(this);"
     }, postBridgeLines = {
-            "        String animatable = null;", "        try {",
-            "            animatable = (String) new ReflectField(wrapper, \"mAnimatable\").get();",
-            "        } catch (RuntimeException e) {", "        }",
-            "        initXWalkContent(animatable);"
+            "        initXWalkContent();"
     })
     public XWalkViewInternal(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -386,7 +389,7 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
         mContext = getContext();
 
         mXWalkHitTestResult = new XWalkHitTestResultInternal();
-        initXWalkContent(null);
+        initXWalkContent();
     }
 
     // TODO(yongsheng): we should remove this since we have getContext()?
@@ -401,21 +404,22 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
         mContent.supplyContentsForPopup(newXWalkView == null ? null : newXWalkView.mContent);
     }
 
-    protected void initXWalkContent(String animatable) {
+    protected void initXWalkContent() {
         XWalkViewDelegate.init(null, mContext);
 
         if (mContext instanceof Activity) {
             ApplicationStatusManager.informActivityStarted((Activity) mContext);
         }
 
-        if (!CommandLine.getInstance().hasSwitch("disable-xwalk-extensions")) {
-            BuiltinXWalkExtensions.load(mContext);
-        } else {
+        // TODO(iotto) : Fix or drop extensions
+//        if (!CommandLine.getInstance().hasSwitch("disable-xwalk-extensions")) {
+//            BuiltinXWalkExtensions.load(mContext);
+//        } else {
             XWalkPreferencesInternal.setValue(XWalkPreferencesInternal.ENABLE_EXTENSIONS, false);
-        }
+//        }
 
         mIsHidden = false;
-        mContent = new XWalkContent(mContext, animatable, this);
+        mContent = new XWalkContent(mContext, this);
 
         // If XWalkView was created in onXWalkReady(), and the activity which owns
         // XWalkView was destroyed, pauseTimers() will be invoked. Reentry the activity,
@@ -740,6 +744,32 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
     }
 
     /**
+     * @return
+     * @since Tenta
+     */
+    @XWalkAPI
+    public int getLastCommittedEntryIndex() {
+        if (mContent == null)
+            return -1;
+        checkThreadSafety();
+        return mContent.getLastCommittedEntryIndex();
+
+    }
+
+    /**
+     * @return
+     * @since Tenta
+     */
+    @XWalkAPI
+    public int getPendingEntryIndex() {
+        if (mContent == null)
+            return -1;
+        checkThreadSafety();
+        return mContent.getPendingEntryIndex();
+
+    }
+
+    /**
      * Injects the supplied Java object into this XWalkViewInternal. Each method defined in the
      * class of the object should be marked with {@link JavascriptInterface} if it's called by
      * JavaScript.
@@ -993,14 +1023,12 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
      * @return true if success; false otherwise
      */
     @XWalkAPI
-    public boolean saveHistory(final String id, final String encKey) {
-        if (mContent == null)
-            return false;
-
-        if (mContent.saveHistory(id, encKey) != null) {
-            return true;
+    public int saveHistory(final String id, final String encKey) {
+        if (mContent == null) {
+            return MetaErrors.ERR_INVALID_POINTER;
         }
-        return false;
+
+        return mContent.saveHistory(id, encKey);
     }
 
     /**
@@ -1011,15 +1039,12 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
      * @return true if success; false otherwise
      */
     @XWalkAPI
-    public boolean restoreHistory(final String id, final String encKey) {
+    public int restoreHistory(final String id, final String encKey) {
         if (mContent == null) {
-            return false;
+            return MetaErrors.ERR_INVALID_POINTER;
         }
 
-        if (mContent.restoreHistory(id, encKey) != null) {
-            return true;
-        }
-        return false;
+        return mContent.restoreHistory(id, encKey);
     }
 
     /**
@@ -1030,12 +1055,12 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
     @XWalkAPI
     public int getMetaFsError() {
         if (mContent == null) {
-            return -6; //ERR_INVALID_POINTER
+            return MetaErrors.ERR_INVALID_POINTER;
         }
-        
+
         return mContent.getMetaFsError();
     }
-    
+
     /**
      * Push old style (stored on Java side) navigation history to new encrypted db
      * 
@@ -1045,16 +1070,13 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
      * @return true if success; false otherwise
      */
     @XWalkAPI
-    public boolean saveOldHistory(byte[] state, final String id,
+    public int saveOldHistory(byte[] state, final String id,
             final String encKey) {
         if (mContent == null) {
-            return false;
+            return MetaErrors.ERR_INVALID_POINTER;
         }
-        if (mContent.saveOldHistory(state, id, encKey) != null) {
-            return true;
-        }
-
-        return false;
+        
+        return mContent.saveOldHistory(state, id, encKey);
     }
 
     /**
@@ -1065,15 +1087,12 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
      * @return true if success; false otherwise
      */
     @XWalkAPI
-    public boolean nukeHistory(final String id, final String encKey) {
+    public int nukeHistory(final String id, final String encKey) {
         if (mContent == null) {
-            return false;
+            return MetaErrors.ERR_INVALID_POINTER;
         }
-        if (mContent.nukeHistory(id, encKey) != null) {
-            return true;
-        }
-
-        return false;
+        
+        return mContent.nukeHistory(id, encKey);
     }
 
     /**
@@ -1489,6 +1508,13 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
         mContent.clearHistory();
     }
 
+    boolean removeHistoryEntryAt(int index) {
+        if (mContent == null)
+            return false;
+        checkThreadSafety();
+        return mContent.removeHistoryEntryAt(index);
+    }
+    
     void destroy() {
         if (mContent == null)
             return;
@@ -1544,13 +1570,10 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
      * @param onTop true for on top.
      * @since 5.0
      */
-    @XWalkAPI
-    public void setZOrderOnTop(boolean onTop) {
-        if (mContent == null)
-            return;
-        mContent.setZOrderOnTop(onTop);
-    }
-
+    /*
+     * @XWalkAPI public void setZOrderOnTop(boolean onTop) { if (mContent == null) return;
+     * mContent.setZOrderOnTop(onTop); }
+     */
     /**
      * Removes the autocomplete popup from the currently focused form field, if present. Note this
      * only affects the display of the autocomplete popup, it does not remove any saved form data
@@ -1838,7 +1861,10 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
      */
     @XWalkAPI
     public int computeHorizontalScrollRange() {
-        return mContent.computeHorizontalScrollRange();
+        if (mContent != null) {
+            return mContent.computeHorizontalScrollRange();
+        }
+        return 0;
     }
 
     /**
@@ -1850,7 +1876,10 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
      */
     @XWalkAPI
     public int computeHorizontalScrollOffset() {
-        return mContent.computeHorizontalScrollOffset();
+        if (mContent != null) {
+            return mContent.computeHorizontalScrollOffset();
+        }
+        return 0;
     }
 
     /**
@@ -1861,7 +1890,10 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
      */
     @XWalkAPI
     public int computeVerticalScrollRange() {
-        return mContent.computeVerticalScrollRange();
+        if (mContent != null) {
+            return mContent.computeVerticalScrollRange();
+        }
+        return 0;
     }
 
     /**
@@ -1872,7 +1904,10 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
      */
     @XWalkAPI
     public int computeVerticalScrollOffset() {
-        return mContent.computeVerticalScrollOffset();
+        if (mContent != null) {
+            return mContent.computeVerticalScrollOffset();
+        }
+        return 0;
     }
 
     /**
@@ -1883,7 +1918,10 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
      */
     @XWalkAPI
     public int computeVerticalScrollExtent() {
-        return mContent.computeVerticalScrollExtent();
+        if (mContent != null) {
+            return mContent.computeVerticalScrollExtent();
+        }
+        return 0;
     }
 
     /**
@@ -1924,6 +1962,19 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
             return;
         checkThreadSafety();
         mContent.stopSwipeRefreshHandler();
+    }
+
+    /**
+     * Enable/Disable swipe refresh handler
+     * 
+     * @param enable
+     */
+    @XWalkAPI
+    public void enableSwipeRefresh(boolean enable) {
+        if (mContent == null)
+            return;
+        checkThreadSafety();
+        mContent.enableSwipeRefresh(enable);
     }
 
     /**
@@ -1977,7 +2028,7 @@ public class XWalkViewInternal extends android.widget.FrameLayout {
         checkThreadSafety();
         return mContent.getCertificateChain();
     }
-    
+
     /**
      * Registers the listener to be notified as find-on-page operations progress.
      *

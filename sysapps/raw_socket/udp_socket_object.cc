@@ -10,6 +10,7 @@
 #include "base/logging.h"
 #include "base/numerics/safe_conversions.h"
 #include "net/base/net_errors.h"
+#include "net/log/net_log_source.h"
 #include "xwalk/sysapps/raw_socket/udp_socket.h"
 
 using namespace xwalk::jsapi::udp_socket; // NOLINT
@@ -31,8 +32,7 @@ UDPSocketObject::UDPSocketObject()
       read_buffer_(new net::IOBuffer(kBufferSize)),
       write_buffer_(new net::IOBuffer(kBufferSize)),
       write_buffer_size_(0),
-      resolver_(net::HostResolver::CreateDefaultResolver(NULL)),
-      single_resolver_(new net::SingleRequestHostResolver(resolver_.get())) {
+      resolver_(net::HostResolver::CreateDefaultResolver(NULL)) {
   handler_.Register("init",
       base::Bind(&UDPSocketObject::OnInit, base::Unretained(this)));
   handler_.Register("_close",
@@ -79,7 +79,7 @@ void UDPSocketObject::OnInit(std::unique_ptr<XWalkExtensionFunctionInfo> info) {
   socket_.reset(new net::UDPSocket(net::DatagramSocket::DEFAULT_BIND,
                                    net::RandIntCallback(),
                                    NULL,
-                                   net::NetLog::Source()));
+                                   net::NetLogSource()));
 
   if (!params->options) {
     OnConnectionOpen(net::OK);
@@ -129,13 +129,14 @@ void UDPSocketObject::OnInit(std::unique_ptr<XWalkExtensionFunctionInfo> info) {
   net::HostResolver::RequestInfo request_info(net::HostPortPair(
       params->options->remote_address, params->options->remote_port));
 
-  int ret = single_resolver_->Resolve(
+  int ret = resolver_->Resolve(
       request_info,
       net::DEFAULT_PRIORITY,
       &addresses_,
       base::Bind(&UDPSocketObject::OnConnectionOpen,
                  base::Unretained(this)),
-      net::BoundNetLog());
+      &request_,
+      net::NetLogWithSource());
 
   if (ret != net::ERR_IO_PENDING)
     OnConnectionOpen(ret);
@@ -189,13 +190,14 @@ void UDPSocketObject::OnSendString(
   net::HostResolver::RequestInfo request_info(net::HostPortPair(
       *params->remote_address, *params->remote_port));
 
-  int ret = single_resolver_->Resolve(
+  int ret = resolver_->Resolve(
       request_info,
       net::DEFAULT_PRIORITY,
       &addresses_,
       base::Bind(&UDPSocketObject::OnSend,
                  base::Unretained(this)),
-      net::BoundNetLog());
+      &request_,
+      net::NetLogWithSource());
 
   if (ret != net::ERR_IO_PENDING)
     OnSend(ret);
@@ -212,7 +214,7 @@ void UDPSocketObject::OnRead(int status) {
     return;
   }
 
-  std::unique_ptr<base::Value> data(base::BinaryValue::CreateWithCopiedBuffer(
+  std::unique_ptr<base::Value> data(base::Value::CreateWithCopiedBuffer(
       static_cast<char*>(read_buffer_->data()), status));
 
   UDPMessageEvent event;
@@ -222,7 +224,7 @@ void UDPSocketObject::OnRead(int status) {
   event.remote_address = from_.ToStringWithoutPort();
 
   std::unique_ptr<base::ListValue> eventData(new base::ListValue);
-  eventData->Append(event.ToValue().release());
+  eventData->Append(event.ToValue());
 
   if (!is_suspended_)
     DispatchEvent("message", std::move(eventData));

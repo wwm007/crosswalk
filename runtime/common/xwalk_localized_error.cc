@@ -23,6 +23,7 @@
 
 using blink::WebURLError;
 
+namespace xwalk {
 namespace {
 
 struct LocalizedErrorMap {
@@ -150,7 +151,7 @@ const LocalizedErrorMap http_error_options[] = {
     IDS_ERRORPAGES_SUMMARY_WEBSITE_CANNOT_HANDLE_REQUEST,
   },
   { 503,
-    IDS_ERRORPAGES_SUMMARY_SERVICE_UNAVAILABLE,
+    IDS_ERRORPAGES_SUMMARY_WEBSITE_CANNOT_HANDLE_REQUEST,
   },
   { 504,
     IDS_ERRORPAGES_SUMMARY_GATEWAY_TIMEOUT,
@@ -224,12 +225,13 @@ const LocalizedErrorMap* LookupErrorMap(const std::string& error_domain,
 const char LocalizedError::kHttpErrorDomain[] = "http";
 const char LocalizedError::kDnsProbeErrorDomain[] = "dnsprobe";
 
-base::string16 LocalizedError::GetErrorDetails(const blink::WebURLError& error,
+base::string16 LocalizedError::GetErrorDetails(const std::string& error_domain, const blink::WebURLError& error,
                                                bool is_post) {
-  const LocalizedErrorMap* error_map =
-      LookupErrorMap(error.domain.utf8(), error.reason, is_post);
+  const LocalizedErrorMap* error_map = LookupErrorMap(error_domain, error.reason(), is_post);
   if (error_map)
     return l10n_util::GetStringUTF16(error_map->summary_resource_id);
   else
     return l10n_util::GetStringUTF16(IDS_ERRORPAGES_SUMMARY_NOT_AVAILABLE);
 }
+
+} // namesapce xwalk

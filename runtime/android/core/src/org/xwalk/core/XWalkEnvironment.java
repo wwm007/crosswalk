@@ -17,9 +17,10 @@ import java.io.InputStreamReader;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Locale;
 
 class XWalkEnvironment {
-    private static final String TAG = "XWalkLib";
+    private static final String TAG = "XWalkEnvironment";
 
     private static final String META_XWALK_ENABLE_DOWNLOAD_MODE = "xwalk_enable_download_mode";
     private static final String META_XWALK_DOWNLOAD_MODE = "xwalk_download_mode";
@@ -44,6 +45,7 @@ class XWalkEnvironment {
     private static Boolean sIsXWalkVerify;
 
     public static void init(Context context) {
+        Log.d(TAG, "init " + context);
         sApplicationContext = context.getApplicationContext();
     }
 
@@ -176,7 +178,7 @@ class XWalkEnvironment {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     throw new NoSuchFieldError();
                 }
-                String abi = Build.CPU_ABI.toLowerCase();
+                String abi = Build.CPU_ABI.toLowerCase(Locale.US);
                 switch (abi) {
                     case "armeabi":
                     case "armeabi-v7a":
@@ -195,7 +197,7 @@ class XWalkEnvironment {
                         throw new RuntimeException("Unexpected CPU_ABI: " + abi);
                 }
             } catch (NoSuchFieldError e) {
-                String arch = System.getProperty("os.arch").toLowerCase();
+                String arch = System.getProperty("os.arch").toLowerCase(Locale.US);
                 switch (arch) {
                     case "x86":
                     case "i686":
@@ -218,6 +220,7 @@ class XWalkEnvironment {
                         break;
                     case "aarch64":
                     case "armv8":
+                    case "armv8l":
                     case "arm64":
                         if (is64bitDevice()) {
                             sRuntimeAbi = "arm64-v8a";
@@ -248,13 +251,13 @@ class XWalkEnvironment {
     public static String getDeviceAbi() {
         if (sDeviceAbi == null) {
             try {
-                sDeviceAbi = Build.SUPPORTED_ABIS[0].toLowerCase();
+                sDeviceAbi = Build.CPU_ABI.toLowerCase(Locale.US);
             } catch (NoSuchFieldError e) {
                 try {
                     Process process = Runtime.getRuntime().exec("getprop ro.product.cpu.abi");
                     InputStreamReader ir = new InputStreamReader(process.getInputStream());
                     BufferedReader input = new BufferedReader(ir);
-                    sDeviceAbi = input.readLine().toLowerCase();
+                    sDeviceAbi = input.readLine().toLowerCase(Locale.US);
                     input.close();
                     ir.close();
                 } catch (IOException ex) {

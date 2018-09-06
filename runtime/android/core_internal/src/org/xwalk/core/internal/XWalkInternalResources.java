@@ -16,8 +16,11 @@ class XWalkInternalResources {
     private static boolean loaded = false;
     private final static String INTERNAL_RESOURCE_CLASSES[] = {
         "org.chromium.components.web_contents_delegate_android.R",
+        "org.chromium.components.autofill.R",
+//        "org.chromium.android_webview.R",
         "org.chromium.content.R",
         "org.chromium.ui.R",
+//        "android.support.v7.appcompat.R",
         "org.xwalk.core.internal.R"
     };
     private final static String GENERATED_RESOURCE_CLASS = "org.xwalk.core.R";
@@ -39,7 +42,7 @@ class XWalkInternalResources {
                     try {
                         generatedInnerClazz = appClassLoader.loadClass(generatedInnerClassName);
                     } catch (ClassNotFoundException e) {
-                        Log.w(TAG, generatedInnerClassName + "is not found.");
+                        Log.w(TAG, generatedInnerClassName + " (generatedInnerClassName) is not found.");
                         continue;
                     }
                     Field[] fields = innerClazz.getFields();
@@ -51,19 +54,19 @@ class XWalkInternalResources {
                             field.setInt(null, value);
                         } catch (IllegalAccessException e) {
                             Log.w(TAG, generatedInnerClazz.getName() + "." +
-                                    field.getName() + " is not accessable.");
+                                    field.getName() + " (IllegalAccessException) is not accessable.");
                         } catch (IllegalArgumentException e) {
                             Log.w(TAG, generatedInnerClazz.getName() + "." +
-                                    field.getName() + " is not int.");
+                                    field.getName() + " (IllegalArgumentException) is not int.");
                         } catch (NoSuchFieldException e) {
                             Log.w(TAG, generatedInnerClazz.getName() + "." +
-                                    field.getName() + " is not found.");
+                                    field.getName() + " (NoSuchFieldException) is not found.");
                         }
                         if (Modifier.isFinal(field.getModifiers())) field.setAccessible(false);
                     }
                 }
             } catch (ClassNotFoundException e) {
-                Log.w(TAG, resourceClass + "is not found.");
+                Log.w(TAG, resourceClass + " (resourceClass) is not found.");
             }
         }
     }

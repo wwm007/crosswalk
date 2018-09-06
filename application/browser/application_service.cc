@@ -51,11 +51,13 @@ Application* ApplicationService::Launch(
 
   Application* application = Application::Create(application_data,
     browser_context_).release();
-  ScopedVector<Application>::iterator app_iter =
+
+  AppVector::iterator app_iter =
       applications_.insert(applications_.end(), application);
 
   if (!application->Launch()) {
     applications_.erase(app_iter);
+    delete application;
     return NULL;
   }
 
@@ -66,8 +68,9 @@ Application* ApplicationService::Launch(
       base::ASCIIToUTF16(application->data()->Name()).c_str());
 #endif
 
-  FOR_EACH_OBSERVER(Observer, observers_,
-                    DidLaunchApplication(application));
+  for ( auto& observer : observers_ ) {
+    observer.DidLaunchApplication(application);
+  }
 
   return application;
 }
@@ -200,7 +203,7 @@ struct ApplicationIDComparator {
 
 Application* ApplicationService::GetApplicationByRenderHostID(int id) const {
   ApplicationRenderHostIDComparator comparator(id);
-  ScopedVector<Application>::const_iterator found = std::find_if(
+  AppVector::const_iterator found = std::find_if(
       applications_.begin(), applications_.end(), comparator);
   if (found != applications_.end())
     return *found;
@@ -210,11 +213,11 @@ Application* ApplicationService::GetApplicationByRenderHostID(int id) const {
 Application* ApplicationService::GetApplicationByID(
     const std::string& app_id) const {
   ApplicationIDComparator comparator(app_id);
-  ScopedVector<Application>::const_iterator found = std::find_if(
+  AppVector::const_iterator found = std::find_if(
       applications_.begin(), applications_.end(), comparator);
   if (found != applications_.end())
     return *found;
-  return NULL;
+  return nullptr;
 }
 
 void ApplicationService::AddObserver(Observer* observer) {
@@ -227,13 +230,17 @@ void ApplicationService::RemoveObserver(Observer* observer) {
 
 void ApplicationService::OnApplicationTerminated(
                                       Application* application) {
-  ScopedVector<Application>::iterator found = std::find(
+  AppVector::iterator found = std::find(
       applications_.begin(), applications_.end(), application);
   CHECK(found != applications_.end());
-  FOR_EACH_OBSERVER(Observer, observers_,
-                    WillDestroyApplication(application));
+  for ( auto& observer : observers_ ) {
+    observer.WillDestroyApplication(application);
+  }
+
+
   scoped_refptr<ApplicationData> app_data = application->data();
   applications_.erase(found);
+  delete application;
 
   if (app_data->source_type() == ApplicationData::TEMP_DIRECTORY) {
       LOG(INFO) << "Deleting the app temporary directory "
@@ -250,7 +257,7 @@ void ApplicationService::OnApplicationTerminated(
   }
 
   if (applications_.empty()) {
-    base::MessageLoop::current()->PostTask(
+    base::MessageLoop::current()->task_runner()->PostTask(
           FROM_HERE, base::MessageLoop::QuitWhenIdleClosure());
   }
 }

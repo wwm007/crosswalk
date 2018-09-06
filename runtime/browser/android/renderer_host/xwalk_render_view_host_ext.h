@@ -9,8 +9,10 @@
 #include <string>
 
 #include "base/callback_forward.h"
-#include "base/threading/non_thread_safe.h"
+//#include "base/threading/non_thread_safe.h"
+#include "base/sequence_checker.h"
 #include "content/public/browser/web_contents_observer.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/size_f.h"
 #include "xwalk/runtime/common/android/xwalk_hit_test_data.h"
@@ -24,10 +26,11 @@ struct LoadCommittedDetails;
 
 namespace xwalk {
 
+// TODO(iotto) : See what happened to base::NonThreadSafe
 // Provides RenderViewHost wrapper functionality for sending WebView-specific
 // IPC messages to the renderer and from there to WebKit.
-class XWalkRenderViewHostExt : public content::WebContentsObserver,
-                               public base::NonThreadSafe {
+class XWalkRenderViewHostExt : public content::WebContentsObserver
+                               /*, public base::NonThreadSafe*/ {
  public:
   // To send receive messages to a RenderView we take the WebContents instance,
   // as it internally handles RenderViewHost instances changing underneath us.
@@ -78,14 +81,18 @@ class XWalkRenderViewHostExt : public content::WebContentsObserver,
   // content::WebContentsObserver implementation.
   void RenderViewCreated(content::RenderViewHost* render_view_host) override;
   void RenderProcessGone(base::TerminationStatus status) override;
-  void DidNavigateAnyFrame(
+  void DidFinishNavigation(content::NavigationHandle* navigation_handle) override;
+/*  void DidNavigateAnyFrame(
       content::RenderFrameHost* render_frame_host,
       const content::LoadCommittedDetails& details,
       const content::FrameNavigateParams& params) override;
+*/
   void OnPageScaleFactorChanged(float page_scale_factor) override;
-  bool OnMessageReceived(const IPC::Message& message) override;
+  bool OnMessageReceived(const IPC::Message& message,
+                         content::RenderFrameHost* render_frame_host) override;
 
-  void OnDocumentHasImagesResponse(int msg_id, bool has_images);
+  void OnDocumentHasImagesResponse(content::RenderFrameHost* render_frame_host,
+                                   int msg_id, bool has_images);
   void OnUpdateHitTestData(const XWalkHitTestData& hit_test_data);
   void OnPictureUpdated();
 
@@ -103,6 +110,9 @@ class XWalkRenderViewHostExt : public content::WebContentsObserver,
   std::string pending_base_url_;
   std::string pending_match_patterns_;
   bool is_render_view_created_;
+  SkColor background_color_;
+
+  SEQUENCE_CHECKER(sequence_checker_);
 
   DISALLOW_COPY_AND_ASSIGN(XWalkRenderViewHostExt);
 };

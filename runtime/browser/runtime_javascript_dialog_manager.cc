@@ -25,19 +25,19 @@ RuntimeJavaScriptDialogManager::~RuntimeJavaScriptDialogManager() {
 void RuntimeJavaScriptDialogManager::RunJavaScriptDialog(
     content::WebContents* web_contents,
     const GURL& origin_url,
-    content::JavaScriptMessageType javascript_message_type,
+    content::JavaScriptDialogType javascript_dialog_type,
     const base::string16& message_text,
     const base::string16& default_prompt_text,
-    const DialogClosedCallback& callback,
+    DialogClosedCallback callback,
     bool* did_suppress_message) {
 #if defined(OS_ANDROID)
-  XWalkContentsClientBridgeBase* bridge =
-      XWalkContentsClientBridgeBase::FromWebContents(web_contents);
-  bridge->RunJavaScriptDialog(javascript_message_type,
+  XWalkContentsClientBridge* bridge =
+      XWalkContentsClientBridge::FromWebContents(web_contents);
+  bridge->RunJavaScriptDialog(javascript_dialog_type,
                               origin_url,
                               message_text,
                               default_prompt_text,
-                              callback);
+                              std::move(callback));
 #else
   *did_suppress_message = true;
   NOTIMPLEMENTED();
@@ -46,13 +46,14 @@ void RuntimeJavaScriptDialogManager::RunJavaScriptDialog(
 
 void RuntimeJavaScriptDialogManager::RunBeforeUnloadDialog(
     content::WebContents* web_contents,
+    content::RenderFrameHost* render_frame_host,
     bool is_reload,
-    const DialogClosedCallback& callback) {
+    DialogClosedCallback callback) {
 #if defined(OS_ANDROID)
-  XWalkContentsClientBridgeBase* bridge =
-      XWalkContentsClientBridgeBase::FromWebContents(web_contents);
+  XWalkContentsClientBridge* bridge =
+      XWalkContentsClientBridge::FromWebContents(web_contents);
   bridge->RunBeforeUnloadDialog(web_contents->GetURL(),
-                                callback);
+                                std::move(callback));
 #else
   NOTIMPLEMENTED();
   callback.Run(true, base::string16());
@@ -60,13 +61,9 @@ void RuntimeJavaScriptDialogManager::RunBeforeUnloadDialog(
 #endif
 }
 
-void RuntimeJavaScriptDialogManager::CancelActiveAndPendingDialogs(
-    content::WebContents* web_contents) {
-  NOTIMPLEMENTED();
-}
-
-void RuntimeJavaScriptDialogManager::ResetDialogState(
-    content::WebContents* web_contents) {
+void RuntimeJavaScriptDialogManager::CancelDialogs(
+    content::WebContents* web_contents,
+    bool reset_state) {
   NOTIMPLEMENTED();
 }
 

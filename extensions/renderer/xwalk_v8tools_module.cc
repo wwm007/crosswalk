@@ -11,6 +11,7 @@
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebView.h"
 #include "xwalk/extensions/renderer/xwalk_v8_utils.h"
+#include "base/message_loop/message_loop.h"
 
 using content::RenderView;
 using blink::WebFrame;
@@ -76,7 +77,7 @@ void LifecycleTrackerCleanup1(
   // callback we are stuck inbetween Blink's GC prologue and epilogue that
   // forbid script execution and crash Crosswalk in debug mode when certain
   // objects (such as `console') are referenced.
-  base::MessageLoop::current()->PostTask(
+  base::MessageLoop::current()->task_runner()->PostTask(
       FROM_HERE, base::Bind(&LifecycleTrackerCleanup2,
                             data));
 }
@@ -133,7 +134,7 @@ void LifecycleTracker(const v8::FunctionCallbackInfo<v8::Value>& info) {
       v8::String::NewFromUtf8(isolate, "destructor"),
       LifecycleTrackerDestructorGetter, LifecycleTrackerDestructorSetter,
       v8::External::New(isolate, wrapper), v8::AccessControl::DEFAULT,
-      v8::PropertyAttribute::DontDelete);
+      v8::PropertyAttribute::DontDelete).ToChecked();
   info.GetReturnValue().Set(wrapper->handle);
 }
 
@@ -141,13 +142,13 @@ void LifecycleTracker(const v8::FunctionCallbackInfo<v8::Value>& info) {
 // getWindowObject
 // ===============
 RenderView* GetCurrentRenderView() {
-  WebLocalFrame* frame = WebLocalFrame::frameForCurrentContext();
+  WebLocalFrame* frame = WebLocalFrame::FrameForCurrentContext();
   DCHECK(frame) << "There should be an active frame here";
 
   if (!frame)
     return NULL;
 
-  WebView* view = frame->view();
+  WebView* view = frame->View();
   if (!view)
     return NULL;
 
@@ -175,11 +176,11 @@ void GetWindowObject(const v8::FunctionCallbackInfo<v8::Value>& args) {
   if (!new_view)
     return;
 
-  WebFrame* opener = cur_view->GetWebView()->mainFrame();
-  WebFrame* frame = new_view->GetWebView()->mainFrame();
-  frame->setOpener(opener);
+  WebFrame* opener = cur_view->GetWebView()->MainFrame();
+  WebFrame* frame = new_view->GetWebView()->MainFrame();
+  frame->SetOpener(opener);
 
-  v8::Local<v8::Value> window = frame->mainWorldScriptContext()->Global();
+  v8::Local<v8::Value> window = frame->ToWebLocalFrame()->MainWorldScriptContext()->Global();
   args.GetReturnValue().Set(window);
 }
 

@@ -6,9 +6,8 @@
 
 #include "base/android/jni_android.h"
 #include "base/android/jni_registrar.h"
-#include "components/navigation_interception/component_jni_registrar.h"
-#include "components/web_contents_delegate_android/component_jni_registrar.h"
-#include "net/android/net_jni_registrar.h"
+//#include "components/web_contents_delegate_android/component_jni_registrar.h"
+//#include "net/android/net_jni_registrar.h"
 #include "xwalk/extensions/common/android/xwalk_extension_android.h"
 #include "xwalk/extensions/common/android/xwalk_native_extension_loader_android.h"
 #include "xwalk/runtime/browser/android/cookie_manager.h"
@@ -28,46 +27,44 @@
 #include "xwalk/runtime/browser/android/xwalk_view_delegate.h"
 #include "xwalk/runtime/browser/android/xwalk_web_contents_delegate.h"
 #include "xwalk/runtime/browser/android/xwalk_web_resource_response_impl.h"
-#include "xwalk/runtime/browser/android/tenta/dummy_native_test.h"
-#include "xwalk/runtime/browser/android/net/host_resolver_tenta.h"
 
 namespace xwalk {
 
-static base::android::RegistrationMethod kXWalkRegisteredMethods[] = {
-  // Register JNI for xwalk classes.
-  { "AndroidProtocolHandler", RegisterAndroidProtocolHandler },
-  { "CookieManager", RegisterCookieManager },
-  { "InputStream", RegisterInputStream },
-  { "NavigationInterception",
-      navigation_interception::RegisterNavigationInterceptionJni },
-  { "NetAndroid", net::android::RegisterJni },
-  { "WebContentsDelegateAndroid",
-      web_contents_delegate_android::RegisterWebContentsDelegateAndroidJni },
-  { "XWalkAutofillClient", RegisterXWalkAutofillClient },
-  { "XWalkContentsClientBridge", RegisterXWalkContentsClientBridge },
-  { "XWalkContentsIoThreadClientImpl",
-      RegisterXWalkContentsIoThreadClientImpl },
-  { "XWalkContent", RegisterXWalkContent },
-  { "XWalkContentLifecycleNotifier", RegisterXWalkContentLifecycleNotifier },
-  { "XWalkPresentationHost", RegisterXWalkPresentationHost },
-  { "XWalkDevToolsServer", RegisterXWalkDevToolsServer },
-  { "XWalkExtensionAndroid", extensions::RegisterXWalkExtensionAndroid },
-  { "XWalkHttpAuthHandler", RegisterXWalkHttpAuthHandler },
-  { "XWalkNativeExtensionLoaderAndroid",
-      extensions::RegisterXWalkNativeExtensionLoaderAndroid },
-  { "XWalkPathHelper", RegisterXWalkPathHelper },
-  { "XWalkSettings", RegisterXWalkSettings },
-  { "XWalkFormDatabase", RegisterXWalkFormDatabase },
-  { "XWalkViewDelegate", RegisterXWalkViewDelegate },
-  { "XWalkWebContentsDelegate", RegisterXWalkWebContentsDelegate },
-  { "XWalkWebResourceResponseImpl", RegisterXWalkWebResourceResponse },
-  { "DummyNativeTest", tenta::RegisterTentaDummyNativeTest},
-  { "HostResolverTenta", tenta::RegisterHostResolverTentaNative},
-};
+//static base::android::RegistrationMethod kXWalkRegisteredMethods[] = {
+//  // Register JNI for xwalk classes.
+//  { "AndroidProtocolHandler", RegisterAndroidProtocolHandler },
+//  { "CookieManager", RegisterCookieManager },
+//  { "InputStream", RegisterInputStream },
+//  { "NetAndroid", net::android::RegisterJni },
+//  { "WebContentsDelegateAndroid",
+//      web_contents_delegate_android::RegisterWebContentsDelegateAndroidJni },
+//  { "XWalkAutofillClient", RegisterXWalkAutofillClient },
+//  { "XWalkContentsClientBridge", RegisterXWalkContentsClientBridge },
+//  { "XWalkContentsIoThreadClientImpl",
+//      RegisterXWalkContentsIoThreadClientImpl },
+//  { "XWalkContent", RegisterXWalkContent },
+//  { "XWalkContentLifecycleNotifier", RegisterXWalkContentLifecycleNotifier },
+//  { "XWalkPresentationHost", RegisterXWalkPresentationHost },
+//  { "XWalkDevToolsServer", RegisterXWalkDevToolsServer },
+//  { "XWalkExtensionAndroid", extensions::RegisterXWalkExtensionAndroid },
+//  { "XWalkHttpAuthHandler", RegisterXWalkHttpAuthHandler },
+//  { "XWalkNativeExtensionLoaderAndroid",
+//      extensions::RegisterXWalkNativeExtensionLoaderAndroid },
+//  { "XWalkPathHelper", RegisterXWalkPathHelper },
+//  { "XWalkSettings", RegisterXWalkSettings },
+//  { "XWalkFormDatabase", RegisterXWalkFormDatabase },
+//  { "XWalkViewDelegate", RegisterXWalkViewDelegate },
+//  { "XWalkWebContentsDelegate", RegisterXWalkWebContentsDelegate },
+//  { "XWalkWebResourceResponseImpl", RegisterXWalkWebResourceResponse },
+//#ifdef TENTA_CHROMIUM_BUILD
+//  { "HostResolverTenta", tenta::RegisterHostResolverTentaNative},
+//#endif
+//};
 
 bool RegisterJni(JNIEnv* env) {
-  return RegisterNativeMethods(env,
-    kXWalkRegisteredMethods, arraysize(kXWalkRegisteredMethods));
+//  return RegisterNativeMethods(env,
+//    kXWalkRegisteredMethods, arraysize(kXWalkRegisteredMethods));
+  return false;
 }
 
 }  // namespace xwalk

@@ -8,6 +8,7 @@
 
 #include "base/lazy_instance.h"
 #include "base/logging.h"
+#include "base/memory/ptr_util.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/string_split.h"
@@ -214,19 +215,19 @@ void Manifest::ParseWGTI18nEachPath(const std::string& path) {
   if (!data_->Get(path, &value))
     return;
 
-  if (value->IsType(base::Value::TYPE_DICTIONARY)) {
+  if (value->IsType(base::Value::Type::DICTIONARY)) {
     ParseWGTI18nEachElement(value, path);
     ParseWGTI18nEachElement(value, path, kLocaleFirstOne);
-  } else if (value->IsType(base::Value::TYPE_LIST)) {
+  } else if (value->IsType(base::Value::Type::LIST)) {
     base::ListValue* list;
     value->GetAsList(&list);
 
     bool get_first_one = false;
     for (base::ListValue::iterator it = list->begin();
         it != list->end(); ++it) {
-      ParseWGTI18nEachElement(it->get(), path);
+      ParseWGTI18nEachElement(&(*it), path);
       if (!get_first_one)
-        get_first_one = ParseWGTI18nEachElement(it->get(), path, kLocaleFirstOne);
+        get_first_one = ParseWGTI18nEachElement(&(*it), path, kLocaleFirstOne);
     }
   }
 }
@@ -247,7 +248,7 @@ bool Manifest::ParseWGTI18nEachElement(base::Value* value,
     std::string locale_key(
         GetLocalizedKey(path + kPathConnectSymbol + iter.key(), xml_lang));
     if (!i18n_data_->Get(locale_key, NULL))
-      i18n_data_->Set(locale_key, iter.value().DeepCopy());
+      i18n_data_->Set(locale_key, base::MakeUnique<base::Value>(iter.value().Clone()));
 
     iter.Advance();
   }

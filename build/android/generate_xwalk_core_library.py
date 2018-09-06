@@ -19,6 +19,7 @@ import collections
 import os
 import shutil
 import sys
+import difflib
 
 GYP_ANDROID_DIR = os.path.join(os.path.dirname(__file__),
                                os.pardir, os.pardir, os.pardir,
@@ -82,6 +83,13 @@ def CopyNativeLibraries(output_dir, abi_name, native_libraries):
     shutil.copy2(native_lib, destination_path)
 
 
+def CopyAssets(output_dir, assets_files):
+  destination_path = os.path.join(output_dir, 'assets')
+  build_utils.MakeDirectory(destination_path)
+  for asset in assets_files:
+    shutil.copy2(asset, destination_path)
+    print("CopyAssets %s" % (asset))
+
 def CopyResources(output_dir, resources, resource_strings):
   res_dir = os.path.join(output_dir, 'res')
   build_utils.MakeDirectory(res_dir)
@@ -103,6 +111,7 @@ def CopyResources(output_dir, resources, resource_strings):
   # include the .grd string zips), making sure we replace crunched 9-patch
   # images with the original ones and avoiding file name colisions.
   for index, resource in enumerate(resources):
+    #print('copy resource ::: %s' % (resource.filename));
     with build_utils.TempDir() as temp_dir:
       temp_res_dir = os.path.join(temp_dir, 'res')
       build_utils.ExtractAll(resource.filename, path=temp_res_dir,
@@ -113,6 +122,7 @@ def CopyResources(output_dir, resources, resource_strings):
         res_dir_subpath = os.path.join(res_dir, os.path.basename(dirpath))
         build_utils.MakeDirectory(res_dir_subpath)
         for filename in filenames:
+     #     print('   file ' + filename);
           if filename.endswith('.9.png'):
             # 9-patch files need to be handled specially. We need the original,
             # uncrunched versions to avoid crunching them twice and failing
@@ -122,7 +132,20 @@ def CopyResources(output_dir, resources, resource_strings):
                                        os.path.basename(dirpath),
                                        filename)
             if not os.path.isfile(original_9p):
-              raise IOError("Expected to find %s." % original_9p)
+              # try and find closest match
+              orig_folder = os.path.basename(dirpath) #ex. drawable-ldrtl-xxhdpi-v17
+              subfolders = os.listdir(resource.src)
+              #subfolders = [subf.name for subf in os.scandir(resource.src) if subf.is_dir() ]
+              close_match = difflib.get_close_matches(orig_folder, subfolders)
+              #print(">> for %s/%s closest match is %s" %(orig_folder, filename, close_match))
+              original_9p = os.path.join(resource.src, close_match[0], filename)
+              if not os.path.isfile(original_9p):
+                print("Resource NOT FOUND !!!! %s" %(original_9p))
+                continue
+                #raise IOError("Expected to find %s." % original_9p)
+              #for find_file in build_utils.FindInDirectory(os.path.join(resource.src, close_match[0]), filename):
+                #print("for file %s in path %s found match in %s " %(filename, os.path.basename(dirpath), find_file))
+              #raise IOError("Expected to find %s." % original_9p)
             shutil.copy2(original_9p, os.path.join(dirpath, filename))
           # Avoid ovewriting existing files.
           root, ext = os.path.splitext(filename)
@@ -151,12 +174,14 @@ def MakeResourceTuple(resource_zip, resource_src):
 
   # With GN, |resource_src| is None and we derive the source path from
   # |resource_zip|.
-  if not resource_zip.startswith('gen/'):
-    raise ValueError('%s is expected to be in gen/.' % resource_zip)
+  #if not resource_zip.startswith('gen/'):
+  if not resource_zip.startswith('resource_zips/'):
+    raise ValueError('%s is expected to be in resource_zips/.' % resource_zip)
+
   src_subpath = os.path.dirname(resource_zip)
   for res_subpath in ('android/java/res', 'java/res', 'res'):
     path = os.path.join(SRC_ROOT,
-                        src_subpath[4:],  # Drop the gen/ part.
+                        src_subpath[14:],  # Drop the resource_zips/ part.
                         res_subpath)
     if os.path.isdir(path):
       return Resource(filename=resource_zip, src=path)
@@ -170,6 +195,8 @@ def main(argv):
                       help='Android ABI being used in the build.')
   parser.add_argument('--binary-files', default='',
                       help='Binary files to store in res/raw.')
+  parser.add_argument('--asset-sources', default='',
+                      help='Binary files to store in assets.')
   parser.add_argument('--js-bindings', required=True,
                       help='.js files to copy to res/raw.')
   parser.add_argument('--main-jar', required=True,
@@ -192,9 +219,9 @@ def main(argv):
 
   options = parser.parse_args(build_utils.ExpandFileArgs(sys.argv[1:]))
 
-  options.resource_strings = build_utils.ParseGypList(options.resource_strings)
-  options.resource_zips = build_utils.ParseGypList(options.resource_zips)
-  options.resource_zip_sources = build_utils.ParseGypList(
+  options.resource_strings = build_utils.ParseGnList(options.resource_strings)
+  options.resource_zips = build_utils.ParseGnList(options.resource_zips)
+  options.resource_zip_sources = build_utils.ParseGnList(
       options.resource_zip_sources)
 
   # With GN, just create a list with None as elements, we derive the source
@@ -209,7 +236,24 @@ def main(argv):
   resources = []
   for resource_zip, resource_src in zip(options.resource_zips,
                                         options.resource_zip_sources):
-    if resource_zip.endswith('_grd.resources.zip'):
+    if resource_zip.find('appcompat') != -1:
+      continue
+      appcompat_path = os.path.join(SRC_ROOT, 'third_party/android_tools/sdk/extras/android/support/v7/appcompat/res')
+      #third_party/android_tools/sdk/extras/android/support/v7/appcompat/res
+      print("appcompat_path %s" %(appcompat_path))
+      resources.append(MakeResourceTuple(resource_zip, appcompat_path))
+      continue
+
+    if resource_zip.find('google_play_services') != -1:
+      continue
+    
+    if resource_zip.find('android_arch') != -1:
+        continue
+    
+    if resource_zip.find('android_support') != -1:
+        continue
+    
+    if resource_zip.endswith('_grd.resources.zip'): 
       # In GN, we just use --resource-zips, and the string files are
       # part of the list.
       # We need to put them into options.resource_strings for separate
@@ -218,9 +262,10 @@ def main(argv):
     else:
       resources.append(MakeResourceTuple(resource_zip, resource_src))
 
-  options.binary_files = build_utils.ParseGypList(options.binary_files)
-  options.js_bindings = build_utils.ParseGypList(options.js_bindings)
-  options.native_libraries = build_utils.ParseGypList(options.native_libraries)
+  options.binary_files = build_utils.ParseGnList(options.binary_files)
+  options.asset_sources = build_utils.ParseGnList(options.asset_sources)
+  options.js_bindings = build_utils.ParseGnList(options.js_bindings)
+  options.native_libraries = build_utils.ParseGnList(options.native_libraries)
 
   # Copy Eclipse project files of library project.
   build_utils.DeleteDirectory(options.output_dir)
@@ -233,6 +278,9 @@ def main(argv):
   if options.binary_files:
     CopyBinaryData(options.output_dir, options.binary_files)
 
+  if options.asset_sources:
+    CopyAssets(options.output_dir, options.asset_sources)
+    
   if options.native_libraries:
     CopyNativeLibraries(options.output_dir, options.abi,
                         options.native_libraries)
@@ -246,8 +294,10 @@ def main(argv):
 
   # Write a depfile so that these files, which are not tracked directly by GN,
   # also trigger a re-run of this script when modified.
+  print('depfile_path: %s  first_gn_output: %s' %(options.depfile, options.binary_files))
   build_utils.WriteDepfile(
     options.depfile,
+    options.output_dir,
     options.binary_files + options.native_libraries + options.js_bindings)
 
 

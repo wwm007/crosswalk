@@ -10,6 +10,7 @@
 #include "net/base/ip_endpoint.h"
 #include "net/base/net_errors.h"
 #include "net/socket/stream_socket.h"
+#include "net/log/net_log_source.h"
 #include "xwalk/sysapps/common/binding_object_store.h"
 #include "xwalk/sysapps/raw_socket/tcp_server_socket.h"
 #include "xwalk/sysapps/raw_socket/tcp_socket.h"
@@ -72,7 +73,7 @@ void TCPServerSocketObject::OnInit(
     return;
   }
 
-  socket_.reset(new net::TCPServerSocket(NULL, net::NetLog::Source()));
+  socket_.reset(new net::TCPServerSocket(NULL, net::NetLogSource()));
   net::IPEndPoint address(ip_number, params->options.local_port);
 
   if (socket_->Listen(address, 5) != net::OK) {
@@ -126,10 +127,11 @@ void TCPServerSocketObject::OnAccept(int status) {
 
     std::unique_ptr<base::ListValue> dataList(new base::ListValue);
     dataList->AppendString(object_id);
-    dataList->Append(options.ToValue().release());
+    // std::move moving a temporary object prevents copy elision [-Werror,-Wpessimizing-move]
+    dataList->Append(options.ToValue());
 
     std::unique_ptr<base::ListValue> eventData(new base::ListValue);
-    eventData->Append(dataList.release());
+    eventData->Append(std::move(dataList));
 
     DispatchEvent("connect", std::move(eventData));
   } else {

@@ -4,22 +4,48 @@
 
 package org.xwalk.core.internal;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.webkit.ConsoleMessage;
+
+import org.chromium.base.ContextUtils;
+import org.chromium.content.browser.ActivityContentVideoViewEmbedder;
 import org.chromium.content.browser.ContentVideoView;
+import org.chromium.content.browser.ContentVideoViewEmbedder;
+import org.chromium.content_public.browser.InvalidateTypes;
+import org.chromium.content_public.common.ContentUrlConstants;
 
 class XWalkWebContentsDelegateAdapter extends XWalkWebContentsDelegate {
     private static final String TAG = XWalkWebContentsDelegateAdapter.class.getName();
 
     private XWalkContentsClient mXWalkContentsClient;
+    private XWalkContent mXwalkContent;
 
-    public XWalkWebContentsDelegateAdapter(XWalkContentsClient client) {
+    public XWalkWebContentsDelegateAdapter(XWalkContentsClient client, XWalkContent content) {
         mXWalkContentsClient = client;
+        mXwalkContent = content;
     }
 
+//    public ContentVideoViewEmbedder getContentVideoViewEmbedder() {
+//        +        return new ActivityContentVideoViewEmbedder((Activity) getContext()) {
+//        +            @Override
+//        +            public void enterFullscreenVideo(View view, boolean isVideoLoaded) {
+//        +                super.enterFullscreenVideo(view, isVideoLoaded);
+//        +                mContentViewRenderView.setOverlayVideoMode(true);
+//        +            }
+//        +
+//        +            @Override
+//        +            public void exitFullscreenVideo() {
+//        +                super.exitFullscreenVideo();
+//        +                mContentViewRenderView.setOverlayVideoMode(false);
+//        +            }
+//        +        };
+//        +    }
+    
     @Override
     public boolean shouldCreateWebContents(String contentUrl) {
         if (mXWalkContentsClient != null) {
@@ -27,6 +53,38 @@ class XWalkWebContentsDelegateAdapter extends XWalkWebContentsDelegate {
         }
         return super.shouldCreateWebContents(contentUrl);
     }
+
+    @Override
+    public void loadingStateChanged(boolean toDifferentDocument) {
+    	// TODO fix this; doesn't get called
+        if (mXWalkContentsClient != null) {
+            mXWalkContentsClient.onTitleChanged(mXwalkContent.getTitle(), false);
+        }
+    }
+    
+	@Override
+	public void navigationStateChanged(int flags) {
+
+		if (mXWalkContentsClient != null && (flags & InvalidateTypes.URL) != 0) {
+			// TODO (iotto): continue implementation if needed
+			String url = mXwalkContent.getLastCommittedUrl();
+			url = TextUtils.isEmpty(url) ? ContentUrlConstants.ABOUT_BLANK_DISPLAY_URL : url;
+			mXWalkContentsClient.onNavigationStateChanged(flags, url);
+		}
+		// if ((flags & InvalidateTypes.URL) != 0
+		// && mAwContents.isPopupWindow()
+		// && mXwalkContent.hasAccessedInitialDocument()) {
+		// // Hint the client to show the last committed url, as it may be unsafe to
+		// show
+		// // the pending entry.
+		// String url = mXwalkContent.getLastCommittedUrl();
+		// url = TextUtils.isEmpty(url) ? ContentUrlConstants.ABOUT_BLANK_DISPLAY_URL :
+		// url;
+		// if (mXWalkContentsClient != null) {
+		// mXWalkContentsClient.getCallbackHelper().postSynthesizedPageLoadingForUrlBarUpdate(url);
+		// }
+		// }
+	}
 
     @Override
     public void onLoadProgressChanged(int progress) {

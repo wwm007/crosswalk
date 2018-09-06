@@ -12,34 +12,46 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
 import java.lang.StringBuilder;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Locale;
 
 import android.app.Activity;
+import android.app.Application;
 import android.app.Service;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.AssetManager;
+import android.content.res.Resources;
 import android.content.res.Resources.NotFoundException;
 import android.os.Build;
 import android.util.Log;
+import android.util.SparseArray;
 
+import org.chromium.base.ApplicationStatus;
 import org.chromium.base.ApplicationStatusManager;
+import org.chromium.base.BaseChromiumApplication;
 import org.chromium.base.CommandLine;
 import org.chromium.base.annotations.JNINamespace;
 import org.chromium.base.PathUtils;
 import org.chromium.base.ResourceExtractor;
-import org.chromium.base.ResourceExtractor.ResourceEntry;
+import org.chromium.base.LocaleUtils;
+import org.chromium.base.BuildConfig;
+//import org.chromium.base.ResourceExtractor.ResourceEntry;
 import org.chromium.base.ResourceExtractor.ResourceInterceptor;
+import org.chromium.base.ContextUtils;
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.library_loader.LibraryLoader;
 import org.chromium.base.library_loader.LibraryProcessType;
 import org.chromium.base.library_loader.ProcessInitException;
 import org.chromium.content.browser.BrowserStartupController;
 import org.chromium.content.browser.DeviceUtils;
+//import org.xwalk.core.internal.ResourceRewriter;
 
 @JNINamespace("xwalk")
 class XWalkViewDelegate {
@@ -51,6 +63,17 @@ class XWalkViewDelegate {
     private static final String XWALK_CORE_EXTRACTED_DIR = "extracted_xwalkcore";
     private static final String META_XWALK_ENABLE_DOWNLOAD_MODE = "xwalk_enable_download_mode";
     private static final String META_XWALK_DOWNLOAD_MODE = "xwalk_download_mode";
+//    private static final Method mGetAssignedPackageIdentifiersMethod;
+
+    static {
+/*        try {
+            mGetAssignedPackageIdentifiersMethod =
+                        AssetManager.class.getMethod("getAssignedPackageIdentifiers");
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid reflection", e);
+        }
+*/
+    }
 
     // TODO(rakuco,lincsoon): This list is also in generate_xwalk_core_library.py.
     // We should remove it from one of the places to avoid duplication.
@@ -58,6 +81,7 @@ class XWalkViewDelegate {
             "xwalk.pak",
             "icudtl.dat",
             "xwalk_100_percent.pak",
+            "xwalk_200_percent.pak"
             // Please refer to XWALK-3516, disable v8 use external startup data,
             // reopen it if needed later.
             // "natives_blob.bin",
@@ -90,7 +114,9 @@ class XWalkViewDelegate {
                 builder.append(buffer, 0, length);
             }
 
-            return CommandLine.tokenizeQuotedAruments(
+            // TODO (iotto) : rewrite parsing logic
+            // tokenizeQuotedArguments not public anymore
+            return CommandLine.tokenizeQuotedArguments(
                     builder.toString().toCharArray());
         } catch (IOException e) {
             return null;
@@ -103,7 +129,27 @@ class XWalkViewDelegate {
             }
         }
     }
+private static void displayFiles (AssetManager mgr, String path, int level) {
 
+     Log.v(TAG,"enter displayFiles("+path+")");
+    try {
+        String list[] = mgr.list(path);
+         Log.v(TAG,"L"+level+": list:"+ Arrays.asList(list));
+
+        if (list != null)
+            for (int i=0; i<list.length; ++i)
+                {
+                    if(level>=1){
+                      displayFiles(mgr, path + "/" + list[i], level+1);
+                    }else{
+                         displayFiles(mgr, list[i], level+1);
+                    }
+                }
+    } catch (IOException e) {
+        Log.v(TAG,"List error: can't list" + path);
+    }
+
+}
     public static void init(Context libContext, Context appContext) {
         if (!loadXWalkLibrary(libContext, null)) {
             throw new RuntimeException("Failed to load native library");
@@ -115,10 +161,15 @@ class XWalkViewDelegate {
         Context context = libContext == null ? appContext
                 : new MixedContext(libContext, appContext);
 
-        PathUtils.setPrivateDataDirectorySuffix(PRIVATE_DATA_DIRECTORY_SUFFIX, context);
+        ContextUtils.initApplicationContext(context);
+        PathUtils.setPrivateDataDirectorySuffix(PRIVATE_DATA_DIRECTORY_SUFFIX);
+        ApplicationStatus.initialize((Application) context.getApplicationContext());
 
         // Initialize chromium resources. Assign them the correct ids in xwalk core.
-        XWalkInternalResources.resetIds(context);
+//        XWalkInternalResources.resetIds(context);
+//        ResourceRewriter.rewriteRValues(
+//            getPackageId(context.getResources(), ContextUtils.getApplicationContext().getPackageName()));
+        
 
         // Last place to initialize CommandLine object. If you haven't initialize
         // the CommandLine object before XWalkViewContent is created, here will create
@@ -136,18 +187,29 @@ class XWalkViewDelegate {
 
         // Use MixedContext to initialize the ResourceExtractor, as the pak file
         // is in the library apk if in shared apk mode.
-        ResourceExtractor.get(context);
+//        ResourceExtractor.get();
+        ResourceExtractor.get().startExtractingResources();
+
+//        resourceExtractor.waitForCompletion();
+
+//        final AssetManager mgr = context.getApplicationContext().getAssets();
+//        displayFiles(mgr, "",0);
+
+//        XWalkInternalResources.resetIds(appContext);
 
         startBrowserProcess(context);
 
         if (appContext instanceof Activity) {
-            ApplicationStatusManager.init(((Activity) appContext).getApplication());
+            ApplicationStatusManager.init((BaseChromiumApplication)((Activity) appContext).getApplication());
         } else if (appContext instanceof Service) {
-            ApplicationStatusManager.init(((Service) appContext).getApplication());
+            ApplicationStatusManager.init((BaseChromiumApplication)((Service) appContext).getApplication());
         }
 
         XWalkPresentationHost.createInstanceOnce(context);
+        // ContextUtils.initApplicationContextForNative();
 
+        ResourceExtractor.get().waitForCompletion();
+        XWalkInternalResources.resetIds(context.getApplicationContext());
         sInitialized = true;
     }
 
@@ -162,21 +224,31 @@ class XWalkViewDelegate {
         if (sLibraryLoaded)
             return true;
 
-        if (libDir != null && sLoadedByHoudini == false) {
+        try {
+            LibraryLoader libraryLoader = LibraryLoader.get(LibraryProcessType.PROCESS_BROWSER);
+//            libraryLoader.ensureInitialized();
+        } catch (ProcessInitException e) {
+        }
+
+//TODO(iotto) workarround for lint error using System.load
+
+/*        if (libDir != null && sLoadedByHoudini == false) {
             for (String library : MANDATORY_LIBRARIES) {
                 System.load(libDir + File.separator + "lib" + library + ".so");
             }
         } else {
+*/
             for (String library : MANDATORY_LIBRARIES) {
                 System.loadLibrary(library);
             }
-        }
+//        }
 
         // Load libraries what is wrote in NativeLibraries.java at compile time. It may duplicate
         // with System.loadLibrary("xwalkcore") above, but same library won't be loaded repeatedly.
         try {
             LibraryLoader libraryLoader = LibraryLoader.get(LibraryProcessType.PROCESS_BROWSER);
-            libraryLoader.loadNow(context);
+            libraryLoader.loadNow();
+//            libraryLoader.ensureInitialized();
         } catch (ProcessInitException e) {
         }
 
@@ -200,8 +272,7 @@ class XWalkViewDelegate {
             @Override
             public void run() {
                 try {
-                    LibraryLoader.get(LibraryProcessType.PROCESS_BROWSER)
-                            .ensureInitialized(context);
+                    LibraryLoader.get(LibraryProcessType.PROCESS_BROWSER).ensureInitialized();
                 } catch (ProcessInitException e) {
                     throw new RuntimeException("Cannot initialize Crosswalk Core", e);
                 }
@@ -219,11 +290,12 @@ class XWalkViewDelegate {
                 }
 
                 try {
-                    BrowserStartupController.get(context, LibraryProcessType.PROCESS_BROWSER)
+                    BrowserStartupController.get(LibraryProcessType.PROCESS_BROWSER)
                             .startBrowserProcessesSync(true);
                 } catch (ProcessInitException e) {
                     throw new RuntimeException("Cannot initialize Crosswalk Core", e);
                 }
+
             }
         });
     }
@@ -251,23 +323,40 @@ class XWalkViewDelegate {
         final boolean isTestApk = !isSharedMode
                 && Arrays.asList(context.getAssets().list("")).contains(XWALK_PAK_NAME);
 
-        HashMap<String, ResourceEntry> resourceList = new HashMap<String, ResourceEntry>();
+        ArrayList<String> resourceList = new ArrayList<String>();
+//        HashMap<String, ResourceEntry> resourceList = new HashMap<String, ResourceEntry>();
+        // code fragment from ResourceExtractor
+        Locale defaultLocale = Locale.getDefault();
+        String language = LocaleUtils.getUpdatedLanguageForChromium(defaultLocale.getLanguage());
+        // Currenty (Oct 2016), this array can be as big as 4 entries, so using a capacity
+        // that allows a bit of growth, but is still in the right ballpark..
+        ArrayList<String> activeLocalePakFiles = new ArrayList<String>(6);
+        for (String locale : BuildConfig.COMPRESSED_LOCALES) {
+            if (locale.startsWith(language)) {
+                resourceList.add(locale + ".pak");
+            }
+        }
+        if (resourceList.isEmpty() && BuildConfig.COMPRESSED_LOCALES.length > 0) {
+            assert Arrays.asList(BuildConfig.COMPRESSED_LOCALES).contains(ResourceExtractor.FALLBACK_LOCALE);
+            resourceList.add(ResourceExtractor.FALLBACK_LOCALE + ".pak");
+        }
+
         try {
             int resourceListId = getResourceId(context, XWALK_RESOURCES_LIST_RES_NAME, "array");
             String[] crosswalkResources = context.getResources().getStringArray(resourceListId);
             for (String resource : crosswalkResources) {
-                resourceList.put(resource, new ResourceEntry(0, "", resource));
+                resourceList.add(resource);
             }
         } catch (NotFoundException e) {
             for (String resource : MANDATORY_PAKS) {
-                resourceList.put(resource, new ResourceEntry(0, "", resource));
+                resourceList.add(resource);
             }
         }
         ResourceExtractor.setResourcesToExtract(
-                resourceList.values().toArray(new ResourceEntry[resourceList.size()]));
+                resourceList.toArray(new String[resourceList.size()]));
 
         // For shouldInterceptLoadRequest(), which needs a final value.
-        final HashSet<String> interceptableResources = new HashSet<String>(resourceList.keySet());
+        final HashSet<String> interceptableResources = new HashSet<String>(resourceList);
 
         // For shared mode, assets are in library package.
         // For embedded mode, assets are in res/raw.
@@ -341,13 +430,19 @@ class XWalkViewDelegate {
     private static String getDeviceAbi() {
         if (sDeviceAbi == null) {
             try {
-                sDeviceAbi = Build.SUPPORTED_ABIS[0].toLowerCase();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    sDeviceAbi = Build.SUPPORTED_ABIS[0].toLowerCase(Locale.getDefault());
+                } else {
+                    sDeviceAbi = Build.CPU_ABI;
+                }
+
+                
             } catch (NoSuchFieldError e) {
                 try {
                     Process process = Runtime.getRuntime().exec("getprop ro.product.cpu.abi");
                     InputStreamReader ir = new InputStreamReader(process.getInputStream());
                     BufferedReader input = new BufferedReader(ir);
-                    sDeviceAbi = input.readLine().toLowerCase();
+                    sDeviceAbi = input.readLine().toLowerCase(Locale.getDefault());
                     input.close();
                     ir.close();
                 } catch (IOException ex) {
@@ -358,6 +453,24 @@ class XWalkViewDelegate {
         }
         return sDeviceAbi;
     }
+/*
+        public static int getPackageId(Resources resources, String packageName) {
+            try {
+                SparseArray packageIdentifiers =
+                        (SparseArray) mGetAssignedPackageIdentifiersMethod.invoke(
+                                resources.getAssets());
+                for (int i = 0; i < packageIdentifiers.size(); i++) {
+                    final String name = (String) packageIdentifiers.valueAt(i);
 
+                    if (packageName.equals(name)) {
+                        return packageIdentifiers.keyAt(i);
+                    }
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Invalid reflection", e);
+            }
+            throw new RuntimeException("Package not found: " + packageName);
+        }
+*/
     private static native boolean nativeIsLibraryBuiltForIA();
 }

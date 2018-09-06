@@ -13,6 +13,7 @@
 #include "base/memory/singleton.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/presentation_screen_availability_listener.h"
+#include "content/public/browser/presentation_request.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "xwalk/application/browser/application_system.h"
@@ -34,17 +35,21 @@ void XWalkPresentationServiceDelegate::AddObserver(int render_process_id,
                                                    int render_frame_id,
                                                    Observer* observer) {
   RenderFrameHostId id(render_process_id, render_frame_id);
-  auto presentation_frame = GetOrAddPresentationFrame(id);
+  PresentationFrame* presentation_frame = GetOrAddPresentationFrame(id);
   presentation_frame->set_delegate_observer(observer);
 }
 
 void XWalkPresentationServiceDelegate::RemoveObserver(int render_process_id,
                                                       int render_frame_id) {
   RenderFrameHostId id(render_process_id, render_frame_id);
-  auto presentation_frame = presentation_frames_.get(id);
-  if (presentation_frame) {
-    presentation_frame->set_delegate_observer(nullptr);
-    presentation_frames_.erase(id);
+  
+  auto it = presentation_frames_.find(id);
+  if ( it != presentation_frames_.end() ) {
+    PresentationFrame* presentation_frame = it->second.get();
+    if (presentation_frame) {
+      presentation_frame->set_delegate_observer(nullptr);
+    }
+    presentation_frames_.erase(it);
   }
 }
 
@@ -54,7 +59,7 @@ bool XWalkPresentationServiceDelegate::AddScreenAvailabilityListener(
     PresentationScreenAvailabilityListener* listener) {
   DCHECK(listener);
   RenderFrameHostId id(render_process_id, render_frame_id);
-  auto presentation_frame = GetOrAddPresentationFrame(id);
+  PresentationFrame* presentation_frame = GetOrAddPresentationFrame(id);
   return presentation_frame->SetScreenAvailabilityListener(listener);
 }
 
@@ -64,72 +69,104 @@ void XWalkPresentationServiceDelegate::RemoveScreenAvailabilityListener(
     PresentationScreenAvailabilityListener* listener) {
   DCHECK(listener);
   RenderFrameHostId id(render_process_id, render_frame_id);
-  auto presentation_frame = presentation_frames_.get(id);
-  CHECK(presentation_frame);
-  presentation_frame->RemoveScreenAvailabilityListener(listener);
+  auto it = presentation_frames_.find(id);
+  if ( it != presentation_frames_.end() ) {
+    PresentationFrame* presentation_frame = it->second.get();
+    if ( presentation_frame) {
+      presentation_frame->RemoveScreenAvailabilityListener(listener);
+    }
+  }
 }
 
 void XWalkPresentationServiceDelegate::Reset(int render_process_id,
                                              int render_frame_id) {
   RenderFrameHostId id(render_process_id, render_frame_id);
-  auto presentation_frame = presentation_frames_.get(id);
-  CHECK(presentation_frame);
-  presentation_frame->Reset();
+
+  auto it = presentation_frames_.find(id);
+  if ( it != presentation_frames_.end() ) {
+    PresentationFrame* presentation_frame = it->second.get();
+    if ( presentation_frame) {
+      presentation_frame->Reset();
+    }
+  }
 }
 
-void XWalkPresentationServiceDelegate::SetDefaultPresentationUrl(
-    int render_process_id,
-    int render_frame_id,
-    const std::string& default_presentation_url,
-    const PresentationSessionStartedCallback& callback) {
-  RenderFrameHostId id(render_process_id, render_frame_id);
-  auto presentation_frame = GetOrAddPresentationFrame(id);
-  presentation_frame->set_default_presentation_url(default_presentation_url);
+void XWalkPresentationServiceDelegate::SetDefaultPresentationUrls(
+    const content::PresentationRequest& request,
+    content::DefaultPresentationConnectionCallback callback) {
+
+  // TODO(iotto) :chromium code; see how to adapt to xwalk
+//  if (request.presentation_urls.empty()) {
+//    ClearDefaultPresentationRequest();
+//    return;
+//  }
+//  DCHECK(!callback.is_null());
+//  default_presentation_started_callback_ = std::move(callback);
+//  default_presentation_request_ = request;
+//  for (auto& observer : default_presentation_request_observers_)
+//    observer.OnDefaultPresentationChanged(*default_presentation_request_);
+
+  const auto& render_frame_host_id = request.render_frame_host_id;
+  const auto& presentation_urls = request.presentation_urls;
+
+  PresentationFrame* presentation_frame = GetOrAddPresentationFrame(render_frame_host_id);
+// TODO(iotto) default_presentation_urls is a vector
+  presentation_frame->set_default_presentation_url(presentation_urls[0].spec());
 }
 
 void XWalkPresentationServiceDelegate::OnSessionStarted(
     const RenderFrameHostId& id,
-    const PresentationSessionStartedCallback& success_cb,
-    const PresentationSessionErrorCallback& error_cb,
+    PresentationConnectionCallback success_cb,
+    PresentationConnectionErrorCallback error_cb,
     scoped_refptr<PresentationSession> session,
     const std::string& error) {
-  auto presentation_frame = presentation_frames_.get(id);
-  if (presentation_frame && session) {
-    presentation_frame->OnPresentationSessionStarted(session);
-    success_cb.Run(session->session_info());
-    return;
+  auto it = presentation_frames_.find(id);
+  if ( it != presentation_frames_.end() ) {
+    PresentationFrame* presentation_frame = it->second.get();
+    if (presentation_frame && session) {
+      presentation_frame->OnPresentationSessionStarted(session);
+      std::move(success_cb).Run(session->session_info());
+      return;
+    }
   }
-  error_cb.Run(
+  std::move(error_cb).Run(
       content::PresentationError(content::PRESENTATION_ERROR_UNKNOWN, error));
 }
 
-void XWalkPresentationServiceDelegate::JoinSession(
-    int render_process_id,
-    int render_frame_id,
-    const std::string& presentation_url,
+void XWalkPresentationServiceDelegate::ReconnectPresentation(
+    const content::PresentationRequest& request,
     const std::string& presentation_id,
-    const PresentationSessionStartedCallback& success_cb,
-    const PresentationSessionErrorCallback& error_cb) {
-  RenderFrameHostId id(render_process_id, render_frame_id);
-  auto presentation_frame = presentation_frames_.get(id);
-  CHECK(presentation_frame);
+    content::PresentationConnectionCallback success_cb,
+    content::PresentationConnectionErrorCallback error_cb) {
 
-  for (auto& frame : presentation_frames_) {
-    if (auto session = frame.second->session()) {
-      if (session->session_info().presentation_id == presentation_id &&
-          session->session_info().presentation_url == presentation_url) {
-        presentation_frame->OnPresentationSessionStarted(session);
-        SessionInfo info(presentation_url, presentation_id);
-        success_cb.Run(info);
-        return;
+  const auto& presentation_urls = request.presentation_urls;
+  const auto& render_frame_host_id = request.render_frame_host_id;
+
+  auto it = presentation_frames_.find(render_frame_host_id);
+  if ( it != presentation_frames_.end() ) {
+    PresentationFrame* presentation_frame = it->second.get();
+
+    CHECK(presentation_frame);
+
+    for (auto& frame : presentation_frames_) {
+      PresentationSession* session = frame.second->session();
+      if ( session != nullptr ) {
+// TODO(iotto) use presentation_urls full vector
+        if (session->session_info().presentation_id == presentation_id &&
+            session->session_info().presentation_url == presentation_urls[0]) {
+          presentation_frame->OnPresentationSessionStarted(session);
+          SessionInfo info(presentation_urls[0], presentation_id);
+          std::move(success_cb).Run(info);
+          return;
+        }
       }
     }
   }
 
-  error_cb.Run(content::PresentationError(
+  std::move(error_cb).Run(content::PresentationError(
       content::PRESENTATION_ERROR_NO_PRESENTATION_FOUND,
       "There is no session with id: " + presentation_id + ", and URL: " +
-          presentation_url));
+          presentation_urls[0].spec()));
 }
 
 void XWalkPresentationServiceDelegate::Terminate(
@@ -144,18 +181,21 @@ void XWalkPresentationServiceDelegate::CloseConnection(
     int render_frame_id,
     const std::string& presentation_id) {
   RenderFrameHostId id(render_process_id, render_frame_id);
-  auto presentation_frame = presentation_frames_.get(id);
-  CHECK(presentation_frame);
 
-  if (auto session = presentation_frame->session()) {
-    session->Close();
+  auto it = presentation_frames_.find(id);
+  if ( it != presentation_frames_.end() ) {
+    PresentationFrame* presentation_frame = it->second.get();
+    PresentationSession* session = presentation_frame->session();
+    if (session != nullptr ) {
+      session->Close();
+    }
   }
 }
 
 void XWalkPresentationServiceDelegate::ListenForConnectionStateChange(
     int render_process_id,
     int render_frame_id,
-    const content::PresentationSessionInfo& connection,
+    const content::PresentationInfo& connection,
     const PresentationConnectionStateChangedCallback& state_changed_cb) {
   RenderFrameHostId id(render_process_id, render_frame_id);
   PresentationFrame* presentation_frame = GetOrAddPresentationFrame(id);
@@ -164,11 +204,13 @@ void XWalkPresentationServiceDelegate::ListenForConnectionStateChange(
 
 PresentationFrame* XWalkPresentationServiceDelegate::GetOrAddPresentationFrame(
     const RenderFrameHostId& render_frame_host_id) {
-  if (!presentation_frames_.contains(render_frame_host_id)) {
-    presentation_frames_.add(render_frame_host_id,
-                             PresentationFrame::Create(render_frame_host_id));
+  auto it = presentation_frames_.find(render_frame_host_id);
+
+  if (it == presentation_frames_.end()) {
+    presentation_frames_[render_frame_host_id] =
+                             PresentationFrame::Create(render_frame_host_id);
   }
-  return presentation_frames_.get(render_frame_host_id);
+  return presentation_frames_[render_frame_host_id].get();
 }
 
 }  // namespace xwalk

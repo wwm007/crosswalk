@@ -70,7 +70,8 @@ int XWalkPermissionManager::RequestPermission(
       content::PermissionType permission,
       content::RenderFrameHost* render_frame_host,
       const GURL& requesting_origin,
-      const base::Callback<void(PermissionStatus)>& callback) {
+      bool user_gesture,
+      const base::Callback<void(blink::mojom::PermissionStatus)>& callback) {
   bool should_delegate_request = true;
   for (PendingRequestsMap::Iterator<PendingRequest> it(&pending_requests_);
       !it.IsAtEnd(); it.Advance()) {
@@ -87,7 +88,7 @@ int XWalkPermissionManager::RequestPermission(
 
   switch (permission) {
     case content::PermissionType::GEOLOCATION: {
-      request_id = pending_requests_.Add(new PendingRequest(
+      request_id = pending_requests_.Add(base::MakeUnique<PendingRequest>(
           permission, requesting_origin,
           embedding_origin, render_frame_host,
           callback));
@@ -109,7 +110,7 @@ int XWalkPermissionManager::RequestPermission(
       break;
     }
     case content::PermissionType::NOTIFICATIONS: {
-      request_id = pending_requests_.Add(new PendingRequest(
+      request_id = pending_requests_.Add(base::MakeUnique<PendingRequest>(
         permission, requesting_origin,
         embedding_origin, render_frame_host,
         callback));
@@ -137,8 +138,13 @@ int XWalkPermissionManager::RequestPermission(
     case content::PermissionType::DURABLE_STORAGE:
     case content::PermissionType::MIDI:
     case content::PermissionType::MIDI_SYSEX:
-    case content::PermissionType::PUSH_MESSAGING:
+    case content::PermissionType::SENSORS:
     case content::PermissionType::VIDEO_CAPTURE:
+    case content::PermissionType::FLASH:
+    case content::PermissionType::ACCESSIBILITY_EVENTS:
+    case content::PermissionType::CLIPBOARD_READ:
+    case content::PermissionType::CLIPBOARD_WRITE:
+
       NOTIMPLEMENTED() << "RequestPermission is not implemented for "
                        << static_cast<int>(permission);
       callback.Run(PermissionStatus::DENIED);
@@ -152,11 +158,13 @@ int XWalkPermissionManager::RequestPermission(
 }
 
 int XWalkPermissionManager::RequestPermissions(
-    const std::vector<content::PermissionType>& permissions,
-    content::RenderFrameHost* render_frame_host,
-    const GURL& requesting_origin,
-    const base::Callback<void(
-        const std::vector<PermissionStatus>&)>& callback) {
+const std::vector<content::PermissionType>& permission,
+      content::RenderFrameHost* render_frame_host,
+      const GURL& requesting_origin,
+      bool user_gesture,
+      const base::Callback<void(
+          const std::vector<blink::mojom::PermissionStatus>&)>& callback) {
+
   // TODO(mrunalk): Rework this as per,
   // https://codereview.chromium.org/1419083002
   NOTIMPLEMENTED() << "RequestPermissions not implemented in Crosswalk";
@@ -185,8 +193,12 @@ void XWalkPermissionManager::CancelPermissionRequest(int request_id) {
     case content::PermissionType::MIDI:
     case content::PermissionType::MIDI_SYSEX:
     case content::PermissionType::NOTIFICATIONS:
-    case content::PermissionType::PUSH_MESSAGING:
+    case content::PermissionType::SENSORS:
     case content::PermissionType::VIDEO_CAPTURE:
+    case content::PermissionType::FLASH:
+    case content::PermissionType::ACCESSIBILITY_EVENTS:
+    case content::PermissionType::CLIPBOARD_READ:
+    case content::PermissionType::CLIPBOARD_WRITE:
       NOTIMPLEMENTED() << "CancelPermission not implemented for "
                        << static_cast<int>(pending_request->permission);
       break;
@@ -231,19 +243,13 @@ void XWalkPermissionManager::ResetPermission(
 }
 
 PermissionStatus XWalkPermissionManager::GetPermissionStatus(
-    content::PermissionType permission,
-    const GURL& requesting_origin,
-    const GURL& embedding_origin) {
+      content::PermissionType permission,
+      const GURL& requesting_origin,
+      const GURL& embedding_origin) {
   if (permission == content::PermissionType::PROTECTED_MEDIA_IDENTIFIER)
     return PermissionStatus::GRANTED;
 
   return PermissionStatus::DENIED;
-}
-
-void XWalkPermissionManager::RegisterPermissionUsage(
-    content::PermissionType permission,
-    const GURL& requesting_origin,
-    const GURL& embedding_origin) {
 }
 
 int XWalkPermissionManager::SubscribePermissionStatusChange(

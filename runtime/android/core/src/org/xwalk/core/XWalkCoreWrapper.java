@@ -29,7 +29,7 @@ import junit.framework.Assert;
 class XWalkCoreWrapper {
     private static final String WRAPPER_PACKAGE = "org.xwalk.core";
     private static final String BRIDGE_PACKAGE = "org.xwalk.core.internal";
-    private static final String TAG = "XWalkLib";
+    private static final String TAG = "XWalkCoreWrapper";
     private static final String XWALK_CORE_CLASSES_DEX = "classes.dex";
 
     private static XWalkCoreWrapper sProvisionalInstance;
@@ -125,7 +125,7 @@ class XWalkCoreWrapper {
         LinkedList<ReservedAction> reservedActions = sReservedActions.get(tag);
         for (ReservedAction action : reservedActions) {
             if (action.mObject != null) {
-                Log.d(TAG, "Init reserved object: " + action.mObject.getClass());
+                Log.d(TAG, "Init reserved object: " + action.mObject.getClass().getCanonicalName());
                 new ReflectMethod(action.mObject, "reflectionInit").invoke();
             } else if (action.mClass != null) {
                 Log.d(TAG, "Init reserved class: " + action.mClass.toString());
@@ -341,7 +341,7 @@ class XWalkCoreWrapper {
                 // version is lower than 4.2. Android enables a system path /data/app-lib to store
                 // native libraries starting from 4.2 and load them automatically.
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                    libDir = "/data/data/" + mBridgeContext.getPackageName() + "/lib";
+                    libDir = mBridgeContext.getApplicationInfo().dataDir + "/lib";
                 }
                 architectureMatched = (boolean) method.invoke(mBridgeContext, libDir);
             } else {

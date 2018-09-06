@@ -15,19 +15,23 @@
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/nacl/common/nacl_process_type.h"
+#include "components/nacl/common/features.h"
 #include "content/public/common/content_constants.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/user_agent.h"
-#if defined(ENABLE_PLUGINS)
+#include "ppapi/features/features.h"
+
+#if BUILDFLAG(ENABLE_PLUGINS)
 #include "content/public/common/pepper_plugin_info.h"
 #include "ppapi/shared_impl/ppapi_permissions.h"
 #endif
-#if !defined(DISABLE_NACL)
+#if BUILDFLAG(ENABLE_NACL)
 #include "components/nacl/renderer/plugin/ppapi_entrypoints.h"
 #endif
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "xwalk/application/common/constants.h"
+#include "xwalk/runtime/browser/android/net/url_constants.h"
 #include "xwalk/runtime/common/xwalk_switches.h"
 #include "xwalk/runtime/common/xwalk_paths.h"
 
@@ -35,7 +39,7 @@ const char* const xwalk::XWalkContentClient::kNaClPluginName = "Native Client";
 
 namespace {
 
-#if !defined(DISABLE_NACL)
+#if BUILDFLAG(ENABLE_NACL)
 const char kNaClPluginMimeType[] = "application/x-nacl";
 const char kNaClPluginExtension[] = "";
 const char kNaClPluginDescription[] = "Native Client Executable";
@@ -47,7 +51,7 @@ const char kPnaclPluginExtension[] = "";
 const char kPnaclPluginDescription[] = "Portable Native Client Executable";
 #endif
 
-#if defined(ENABLE_PLUGINS)
+#if BUILDFLAG(ENABLE_PLUGINS)
 const int32_t kPepperFlashPermissions = ppapi::PERMISSION_DEV |
                                       ppapi::PERMISSION_PRIVATE |
                                       ppapi::PERMISSION_BYPASS_USER_GESTURE |
@@ -115,6 +119,7 @@ void AddPepperFlashFromCommandline(
 namespace xwalk {
 
 std::string GetProduct() {
+  // TODO(iotto) : Check out and use version_info::GetProductNameAndVersionForUserAgent();
   return "Chrome/" CHROME_VERSION;
 }
 
@@ -136,7 +141,7 @@ XWalkContentClient::~XWalkContentClient() {
 
 void XWalkContentClient::AddPepperPlugins(
     std::vector<content::PepperPluginInfo>* plugins) {
-#if !defined(DISABLE_NACL)
+#if BUILDFLAG(ENABLE_NACL)
   // Handle Native Client just like the PDF plugin. This means that it is
   // enabled by default for the non-portable case.  This allows apps installed
   // from the Chrome Web Store to use NaCl even if the command line switch
@@ -171,7 +176,7 @@ void XWalkContentClient::AddPepperPlugins(
   }
 #endif
 
-#if defined(ENABLE_PLUGINS)
+#if BUILDFLAG(ENABLE_PLUGINS)
   AddPepperFlashFromCommandline(plugins);
 #endif
 }
@@ -191,20 +196,48 @@ base::string16 XWalkContentClient::GetLocalizedString(int message_id) const {
 base::StringPiece XWalkContentClient::GetDataResource(
     int resource_id,
     ui::ScaleFactor scale_factor) const {
-  return ResourceBundle::GetSharedInstance().GetRawDataResourceForScale(
+  return ui::ResourceBundle::GetSharedInstance().GetRawDataResourceForScale(
       resource_id, scale_factor);
 }
 
 base::RefCountedMemory* XWalkContentClient::GetDataResourceBytes(
     int resource_id) const {
-  return ResourceBundle::GetSharedInstance().LoadDataResourceBytes(resource_id);
+  return ui::ResourceBundle::GetSharedInstance().LoadDataResourceBytes(resource_id);
 }
 
 gfx::Image& XWalkContentClient::GetNativeImageNamed(int resource_id) const {
-  return ResourceBundle::GetSharedInstance().GetNativeImageNamed(resource_id);
+  return ui::ResourceBundle::GetSharedInstance().GetNativeImageNamed(resource_id);
 }
 
-void XWalkContentClient::AddAdditionalSchemes(
+void XWalkContentClient::AddAdditionalSchemes(Schemes* schemes) {
+/*  url::SchemeWithType app_scheme = {application::kApplicationScheme,
+                                    url::SCHEME_WITHOUT_PORT};
+
+  schemes->standard_schemes.push_back(app_scheme);
+*/
+  schemes->standard_schemes.push_back(application::kApplicationScheme);
+  schemes->savable_schemes.push_back(application::kApplicationScheme);
+  schemes->secure_schemes.push_back(application::kApplicationScheme);
+
+// TODO see if further registration needed
+// content from  runtime/renderer/xwalk_content_renderer_client.cc
+/*  blink::WebString application_scheme(
+      blink::WebString::fromASCII(application::kApplicationScheme));
+  blink::WebSecurityPolicy::registerURLSchemeAsSecure(application_scheme);
+  blink::WebSecurityPolicy::registerURLSchemeAsCORSEnabled(application_scheme);
+*/
+  schemes->cors_enabled_schemes.push_back(application::kApplicationScheme);
+#if defined(OS_ANDROID)
+  schemes->local_schemes.push_back(xwalk::kContentScheme);
+/*  blink::WebString content_scheme(
+      blink::WebString::fromASCII(xwalk::kContentScheme));
+  blink::WebSecurityPolicy::registerURLSchemeAsLocal(content_scheme);
+*/
+#endif
+
+}
+
+/*void XWalkContentClient::AddAdditionalSchemes(
     std::vector<url::SchemeWithType>* standard_schemes,
     std::vector<url::SchemeWithType>* referrer_schemes,
     std::vector<std::string>* savable_schemes) {
@@ -219,6 +252,8 @@ void XWalkContentClient::AddSecureSchemesAndOrigins(
     std::set<GURL>* origins) {
     schemes->insert(application::kApplicationScheme);
 }
+*/
+
 
 std::string XWalkContentClient::GetProcessTypeNameInEnglish(int type) {
   switch (type) {

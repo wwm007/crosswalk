@@ -37,6 +37,7 @@
 #include "xwalk/runtime/browser/xwalk_runner.h"
 #include "xwalk/runtime/common/xwalk_runtime_features.h"
 #include "xwalk/runtime/common/xwalk_switches.h"
+#include "gpu/config/gpu_switches.h"
 
 namespace {
 
@@ -154,8 +155,6 @@ void XWalkBrowserMainPartsAndroid::PreMainMessageLoopStart() {
   command_line->AppendSwitch(switches::kXWalkDisableExtensionProcess);
   // Enable viewport.
   command_line->AppendSwitch(switches::kEnableViewport);
-  // Temporary fix for XWALK-7231
-  command_line->AppendSwitch(switches::kDisableUnifiedMediaPipeline);
 
   // Only force to enable WebGL for Android for IA platforms because
   // we've tested the WebGL conformance test. For other platforms, just
@@ -189,11 +188,11 @@ void XWalkBrowserMainPartsAndroid::PostMainMessageLoopStart() {
 
 void XWalkBrowserMainPartsAndroid::PreMainMessageLoopRun() {
   net::NetModule::SetResourceProvider(PlatformResourceProvider);
-  if (parameters_.ui_task) {
-    parameters_.ui_task->Run();
-    delete parameters_.ui_task;
-    run_default_message_loop_ = false;
-  }
+//  if (parameters_.ui_task) {
+//    parameters_.ui_task->Run();
+//    delete parameters_.ui_task;
+//    run_default_message_loop_ = false;
+//  }
 
   xwalk_runner_->PreMainMessageLoopRun();
 
@@ -220,7 +219,7 @@ void XWalkBrowserMainPartsAndroid::PreMainMessageLoopRun() {
 void XWalkBrowserMainPartsAndroid::PostMainMessageLoopRun() {
   XWalkBrowserMainParts::PostMainMessageLoopRun();
 
-  base::MessageLoopForUI::current()->Start();
+//  base::MessageLoopForUI::current()->Start();
 }
 
 void XWalkBrowserMainPartsAndroid::CreateInternalExtensionsForExtensionThread(

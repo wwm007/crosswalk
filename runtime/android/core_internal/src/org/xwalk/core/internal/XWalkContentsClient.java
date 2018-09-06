@@ -5,49 +5,40 @@
 
 package org.xwalk.core.internal;
 
+import java.security.PrivateKey;
+import java.util.HashMap;
+
+import org.chromium.content.browser.ContentVideoViewEmbedder;
+import org.chromium.content_public.browser.WebContents;
+import org.chromium.content_public.browser.WebContentsObserver;
+import org.chromium.net.NetError;
+
 import android.content.pm.ActivityInfo;
-import android.graphics.Bitmap;
 import android.graphics.Picture;
-import android.graphics.Rect;
-import android.graphics.RectF;
 import android.net.http.SslError;
-import android.os.Handler;
-import android.os.Looper;
 import android.os.Message;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.webkit.ConsoleMessage;
 import android.webkit.ValueCallback;
 
-import java.security.PrivateKey;
-import java.util.ArrayList;
-import java.util.HashMap;
-
-import org.chromium.content.browser.ContentViewClient;
-import org.chromium.content_public.browser.WebContents;
-import org.chromium.content_public.browser.WebContentsObserver;
-import org.chromium.net.NetError;
-
 /**
- * Base-class that a XWalkViewContents embedder derives from to receive callbacks.
- * This extends ContentViewClient, as in many cases we want to pass-thru ContentViewCore
- * callbacks right to our embedder, and this setup facilities that.
- * For any other callbacks we need to make transformations of (e.g. adapt parameters
- * or perform filtering) we can provide final overrides for methods here, and then introduce
- * new abstract methods that the our own client must implement.
- * i.e.: all methods in this class should either be final, or abstract.
+ * Base-class that a XWalkViewContents embedder derives from to receive callbacks. This extends
+ * ContentViewClient, as in many cases we want to pass-thru ContentViewCore callbacks right to our
+ * embedder, and this setup facilities that. For any other callbacks we need to make transformations
+ * of (e.g. adapt parameters or perform filtering) we can provide final overrides for methods here,
+ * and then introduce new abstract methods that the our own client must implement. i.e.: all methods
+ * in this class should either be final, or abstract.
  */
-abstract class XWalkContentsClient extends ContentViewClient {
+abstract class XWalkContentsClient {
 
     private static final String TAG = "XWalkContentsClient";
-    private final XWalkContentsClientCallbackHelper mCallbackHelper =
-        new XWalkContentsClientCallbackHelper(this);
+    private final XWalkContentsClientCallbackHelper mCallbackHelper = new XWalkContentsClientCallbackHelper(
+            this);
 
     private XWalkWebContentsObserver mWebContentsObserver;
 
     private double mDIPScale;
-
 
     public class XWalkWebContentsObserver extends WebContentsObserver {
         public XWalkWebContentsObserver(WebContents webContents) {
@@ -58,7 +49,8 @@ abstract class XWalkContentsClient extends ContentViewClient {
         public void didChangeThemeColor(int color) {
             boolean themecolor = XWalkPreferencesInternal.getValue(
                     XWalkPreferencesInternal.ENABLE_THEME_COLOR);
-            if(themecolor) onDidChangeThemeColor(color);
+            if (themecolor)
+                onDidChangeThemeColor(color);
         }
 
         @Override
@@ -67,8 +59,9 @@ abstract class XWalkContentsClient extends ContentViewClient {
         }
 
         @Override
-        public void didFailLoad(boolean isProvisionalLoad, boolean isMainFrame, int errorCode,
-                String description, String failingUrl, boolean wasIgnoredByHandler) {
+        public void didFailLoad(boolean isMainFrame, int errorCode,
+                String description, String failingUrl) {
+//        	org.chromium.base.Log.d("iotto", "error_code=%d, error_str=%s", errorCode, description);
             if (errorCode == NetError.ERR_ABORTED || !isMainFrame) {
                 // This error code is generated for the following reasons:
                 // - XWalkViewInternal.stopLoading is called,
@@ -84,41 +77,102 @@ abstract class XWalkContentsClient extends ContentViewClient {
         }
 
         @Override
-        public void didNavigateAnyFrame(String url, String baseUrl, boolean isReload) {
-            doUpdateVisitedHistory(url, isReload);
+        public void didStartNavigation(String url, boolean isInMainFrame, boolean isSameDocument,
+                boolean isErrorPage) {
+            onNavigationStart(url, isInMainFrame, isSameDocument, isErrorPage);
         }
-
 
         @Override
-        public void didNavigateMainFrame(String url, String baseUrl,
-                boolean isNavigationToDifferentPage, boolean isFragmentNavigation, int statusCode) {
-            stopSwipeRefreshHandler();
+        public void didStartLoading(String url) {
+            onDidStartLoading(url);
+        };
+        
+        @Override
+        public void didFirstVisuallyNonEmptyPaint() {
+            onDidFirstVisuallyNonEmptyPaint();
         }
-
+        /*
+         * @Override public void didNavigateAnyFrame(String url, String baseUrl, boolean isReload) {
+         * doUpdateVisitedHistory(url, isReload); }
+         * @Override public void didNavigateMainFrame(String url, String baseUrl, boolean
+         * isNavigationToDifferentPage, boolean isFragmentNavigation, int statusCode) {
+         * stopSwipeRefreshHandler(); }
+         */
         @Override
         public void didFinishLoad(long frameId, String validatedUrl, boolean isMainFrame) {
+
             // Both didStopLoading and didFinishLoad will be called once a page is finished
             // to load, but didStopLoading will also be called when user clicks "X" button
             // on browser UI to stop loading page.
             //
             // So it is safe for Crosswalk to rely on didStopLoading to ensure onPageFinished
             // can be called.
+            if (isMainFrame) {
+                stopSwipeRefreshHandler();
+            }
+        }
+
+		@Override
+		public void didFinishNavigation(String url, boolean isInMainFrame, boolean isErrorPage, boolean hasCommitted,
+				boolean isSameDocument, boolean isFragmentNavigation, Integer pageTransition, int errorCode,
+				String errorDescription, int httpStatusCode) {
+			if (errorCode != 0) {
+				didFailLoad(isInMainFrame, errorCode, errorDescription, url);
+			}
+
+			onDidFinishNavigation(url, isInMainFrame, isErrorPage, hasCommitted, isSameDocument, isFragmentNavigation,
+					pageTransition, errorCode, errorDescription, httpStatusCode);
+
+	     	// TODO(iotto) : Implement the following!!
+//            if (!hasCommitted) return;
+//
+//            mCommittedNavigation = true;
+//
+//            AwContentsClient client = mAwContentsClient.get();
+//            if (hasCommitted && client != null) {
+//                boolean isReload = pageTransition != null
+//                        && ((pageTransition & PageTransition.CORE_MASK) == PageTransition.RELOAD);
+//                client.getCallbackHelper().postDoUpdateVisitedHistory(url, isReload);
+//            }
+//
+//            if (!isInMainFrame) return;
+//
+//            // Only invoke the onPageCommitVisible callback when navigating to a different document,
+//            // but not when navigating to a different fragment within the same document.
+//            if (!isSameDocument) {
+//                ThreadUtils.postOnUiThread(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        AwContents awContents = mAwContents.get();
+//                        if (awContents != null) {
+//                            awContents.insertVisualStateCallbackIfNotDestroyed(
+//                                    0, new VisualStateCallback() {
+//                                        @Override
+//                                        public void onComplete(long requestId) {
+//                                            AwContentsClient client = mAwContentsClient.get();
+//                                            if (client == null) return;
+//                                            client.onPageCommitVisible(url);
+//                                        }
+//                                    });
+//                        }
+//                    }
+//                });
+//            }
+//
+//            if (client != null && isFragmentNavigation) {
+//                client.getCallbackHelper().postOnPageFinished(url);
+//            }
         }
 
         @Override
         public void documentLoadedInFrame(long frameId, boolean isMainFrame) {
             onDocumentLoadedInFrame(frameId);
         }
-    }
 
-    @Override
-    final public void onUpdateTitle(String title) {
-        onTitleChanged(title);
-    }
-
-    @Override
-    public boolean shouldOverrideKeyEvent(KeyEvent event) {
-        return super.shouldOverrideKeyEvent(event);
+        @Override
+        public void titleWasSet(String title) {
+            onTitleChanged(title, true);
+        }
     }
 
     void installWebContentsObserver(WebContents webContents) {
@@ -136,9 +190,9 @@ abstract class XWalkContentsClient extends ContentViewClient {
         return mCallbackHelper;
     }
 
-    //--------------------------------------------------------------------------------------------
-    //  XWalkViewInternal specific methods that map directly to XWalkViewClient/XWalkWebChromeClient
-    //--------------------------------------------------------------------------------------------
+    // --------------------------------------------------------------------------------------------
+    // XWalkViewInternal specific methods that map directly to XWalkViewClient/XWalkWebChromeClient
+    // --------------------------------------------------------------------------------------------
 
     /**
      * Parameters for the {@link XWalkContentsClient#shouldInterceptRequest} method.
@@ -155,6 +209,7 @@ abstract class XWalkContentsClient extends ContentViewClient {
         // Headers that would have been sent to server.
         public HashMap<String, String> requestHeaders;
     }
+
     public abstract void getVisitedHistory(ValueCallback<String[]> callback);
 
     public abstract void doUpdateVisitedHistory(String url, boolean isReload);
@@ -172,6 +227,8 @@ abstract class XWalkContentsClient extends ContentViewClient {
 
     public abstract boolean shouldOverrideUrlLoading(String url);
 
+    public abstract boolean onRewriteUrlIfNeeded(RewriteUrlValueInternal toRewrite);
+
     public abstract void onUnhandledKeyEvent(KeyEvent event);
 
     public abstract boolean onConsoleMessage(ConsoleMessage consoleMessage);
@@ -181,17 +238,12 @@ abstract class XWalkContentsClient extends ContentViewClient {
 
     public abstract void onReceivedSslError(ValueCallback<Boolean> callback, SslError error);
 
-    public abstract void onReceivedClientCertRequest(ClientCertRequestInternal handler);    
+    public abstract void onReceivedClientCertRequest(ClientCertRequestInternal handler);
 
     public abstract void onReceivedResponseHeaders(WebResourceRequestInner request,
             XWalkWebResourceResponseInternal response);
 
-    public abstract void onReceivedLoginRequest(String realm, String account, String args);
-
     public abstract void onFormResubmission(Message dontResend, Message resend);
-
-    public abstract void onDownloadStart(String url, String userAgent, String contentDisposition,
-            String mimeType, long contentLength);
 
     public abstract void onGeolocationPermissionsShowPrompt(String origin,
             XWalkGeolocationPermissions.Callback callback);
@@ -199,7 +251,8 @@ abstract class XWalkContentsClient extends ContentViewClient {
     public abstract void onGeolocationPermissionsHidePrompt();
 
     public final void onScaleChanged(float oldScaleFactor, float newScaleFactor) {
-        onScaleChangedScaled((float)(oldScaleFactor * mDIPScale), (float)(newScaleFactor * mDIPScale));
+        onScaleChangedScaled((float) (oldScaleFactor * mDIPScale),
+                (float) (newScaleFactor * mDIPScale));
     }
 
     public abstract void onScaleChangedScaled(float oldScale, float newScale);
@@ -214,6 +267,18 @@ abstract class XWalkContentsClient extends ContentViewClient {
 
     protected abstract void onRequestFocus();
 
+    public abstract void onNavigationStateChanged(int flags, final String url);
+
+    public abstract void onNavigationStart(final String url, boolean isInMainFrame,
+            boolean isSameDocument,
+            boolean isErrorPage);
+    public abstract void onDidStartLoading(String url);
+    public abstract void onDidFirstVisuallyNonEmptyPaint();
+
+	public abstract void onDidFinishNavigation(String url, boolean isInMainFrame, boolean isErrorPage,
+			boolean hasCommitted, boolean isSameDocument, boolean isFragmentNavigation, Integer pageTransition,
+			int errorCode, String errorDescription, int httpStatusCode);
+    
     public abstract void onPageStarted(String url);
 
     public abstract void onPageFinished(String url);
@@ -226,7 +291,7 @@ abstract class XWalkContentsClient extends ContentViewClient {
 
     public abstract void onRendererResponsive();
 
-    public abstract void onTitleChanged(String title);
+    public abstract void onTitleChanged(String title, boolean forceNotification);
 
     public abstract void onToggleFullscreen(boolean enterFullscreen);
 
@@ -238,7 +303,7 @@ abstract class XWalkContentsClient extends ContentViewClient {
     // TODO (michaelbai): Remove this method once the same method remove from
     // XWalkContentsClientAdapter.
     public abstract void onShowCustomView(View view,
-           int requestedOrientation, CustomViewCallbackInternal callback);
+            int requestedOrientation, CustomViewCallbackInternal callback);
 
     // TODO (michaelbai): This method should be abstract, having empty body here
     // makes the merge to the Android easy.
@@ -253,15 +318,23 @@ abstract class XWalkContentsClient extends ContentViewClient {
     public abstract void provideClientCertificateResponse(int id, byte[][] certChain,
             PrivateKey privateKey);
 
-    //--------------------------------------------------------------------------------------------
-    //                              Other XWalkViewInternal-specific methods
-    //--------------------------------------------------------------------------------------------
+    public abstract ContentVideoViewEmbedder getContentVideoViewEmbedder();
+
+    // --------------------------------------------------------------------------------------------
+    // Other XWalkViewInternal-specific methods
+    // --------------------------------------------------------------------------------------------
     //
     public abstract void onFindResultReceived(int activeMatchOrdinal, int numberOfMatches,
             boolean isDoneCounting);
 
     /**
+     * For Tenta
+     */
+    public abstract void onOpenDnsSettings(final String failedUrl);
+    
+    /**
      * Called whenever there is a new content picture available.
+     * 
      * @param picture New picture.
      */
     public abstract void onNewPicture(Picture picture);

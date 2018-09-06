@@ -13,13 +13,6 @@ namespace xwalk {
 
 namespace internal {
 
-net::SHA256HashValue getChainFingerprint256(const net::X509Certificate& cert) {
-  net::SHA256HashValue fingerprint =
-      net::X509Certificate::CalculateChainFingerprint256(
-          cert.os_cert_handle(), cert.GetIntermediateCertificates());
-  return fingerprint;
-}
-
 CertPolicy::CertPolicy() {
 }
 
@@ -33,7 +26,7 @@ CertPolicy::CertPolicy(const CertPolicy&) = default;
 // in the saved CertStatus.
 bool CertPolicy::Check(const net::X509Certificate& cert,
                        net::CertStatus error) const {
-  net::SHA256HashValue fingerprint = getChainFingerprint256(cert);
+  net::SHA256HashValue fingerprint = cert.CalculateChainFingerprint256();
   CertMap::const_iterator allowed_iter = allowed_.find(fingerprint);
   return (allowed_iter != allowed_.end()) &&
          (allowed_iter->second & error) &&
@@ -44,7 +37,7 @@ void CertPolicy::Allow(const net::X509Certificate& cert,
                        net::CertStatus error) {
   // If this same cert had already been saved with a different error status,
   // this will replace it with the new error status.
-  net::SHA256HashValue fingerprint = getChainFingerprint256(cert);
+  net::SHA256HashValue fingerprint = cert.CalculateChainFingerprint256();
   allowed_[fingerprint] = error;
 }
 
@@ -57,13 +50,15 @@ XWalkSSLHostStateDelegate::~XWalkSSLHostStateDelegate() {
 }
 
 void XWalkSSLHostStateDelegate::HostRanInsecureContent(const std::string& host,
-                                                       int pid) {
+                                                       int pid,
+                                                       InsecureContentType content_type) {
   // Intentional no-op.
 }
 
 bool XWalkSSLHostStateDelegate::DidHostRunInsecureContent(
     const std::string& host,
-    int pid) const {
+    int pid,
+    InsecureContentType content_type) const {
   // Intentional no-op.
   return false;
 }
@@ -83,7 +78,8 @@ void XWalkSSLHostStateDelegate::AllowCert(const std::string& host,
   cert_policy_for_host_[host].Allow(cert, error);
 }
 
-void XWalkSSLHostStateDelegate::Clear() {
+void XWalkSSLHostStateDelegate::Clear(const base::Callback<bool(const std::string&)>& host_filter) {
+  // TODO(iotto) use host filter if not null
   cert_policy_for_host_.clear();
 }
 

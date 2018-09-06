@@ -17,7 +17,8 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "cc/base/switches.h"
-#include "components/devtools_http_handler/devtools_http_handler.h"
+#include "components/nacl/common/features.h"
+#include "content/browser/devtools/devtools_http_handler.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/main_function_params.h"
@@ -39,7 +40,7 @@
 #include "xwalk/runtime/common/xwalk_runtime_features.h"
 #include "xwalk/runtime/common/xwalk_switches.h"
 
-#if !defined(DISABLE_NACL)
+#if BUILDFLAG(ENABLE_NACL)
 #include "components/nacl/browser/nacl_browser.h"
 #include "components/nacl/browser/nacl_process_host.h"
 #include "xwalk/runtime/browser/nacl_host/nacl_browser_delegate_impl.h"
@@ -183,18 +184,20 @@ void XWalkBrowserMainParts::RegisterExternalExtensions() {
 void XWalkBrowserMainParts::PreMainMessageLoopRun() {
   xwalk_runner_->PreMainMessageLoopRun();
 
-  devtools_http_handler_.reset(
+  XWalkDevToolsManagerDelegate::StartHttpHandler(xwalk_runner_->browser_context());
+
+/*  devtools_http_handler_.reset(
       XWalkDevToolsManagerDelegate::CreateHttpHandler(
           xwalk_runner_->browser_context()));
-
+*/
   extension_service_ = xwalk_runner_->extension_service();
 
   if (extension_service_)
     RegisterExternalExtensions();
 
-#if !defined(DISABLE_NACL)
-  NaClBrowserDelegateImpl* delegate = new NaClBrowserDelegateImpl();
-  nacl::NaClBrowser::SetDelegate(delegate);
+#if BUILDFLAG(ENABLE_NACL)
+  std::unique_ptr<NaClBrowserDelegateImpl> delegate(new NaClBrowserDelegateImpl());
+  nacl::NaClBrowser::SetDelegate(std::move(delegate));
 
   content::BrowserThread::PostTask(
       content::BrowserThread::IO,
@@ -262,7 +265,8 @@ bool XWalkBrowserMainParts::MainMessageLoopRun(int* result_code) {
 
 void XWalkBrowserMainParts::PostMainMessageLoopRun() {
   xwalk_runner_->PostMainMessageLoopRun();
-  devtools_http_handler_.reset();
+  XWalkDevToolsManagerDelegate::StopHttpHandler();
+//  devtools_http_handler_.reset();
 }
 
 void XWalkBrowserMainParts::CreateInternalExtensionsForUIThread(

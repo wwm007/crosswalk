@@ -8,14 +8,15 @@
 #include "base/callback_forward.h"
 #include "base/supports_user_data.h"
 #include "content/public/browser/client_certificate_delegate.h"
+#include "content/public/browser/certificate_request_result_type.h"
 #include "content/public/browser/javascript_dialog_manager.h"
 #include "net/ssl/ssl_cert_request_info.h"
+#include "ui/base/page_transition_types.h"
 
 class GURL;
 class SkBitmap;
 
 namespace content {
-class DesktopNotificationDelegate;
 struct NotificationResources;
 struct PlatformNotificationData;
 class RenderFrameHost;
@@ -37,16 +38,16 @@ class XWalkContentsClientBridgeBase {
  public:
   typedef base::Callback<void(net::X509Certificate*)> SelectCertificateCallback;
   // Adds the handler to the UserData registry.
-  static void Associate(content::WebContents* web_contents,
-                        XWalkContentsClientBridgeBase* handler);
-  static XWalkContentsClientBridgeBase* FromWebContents(
-      content::WebContents* web_contents);
-  static XWalkContentsClientBridgeBase* FromRenderViewID(int render_process_id,
-                                            int render_view_id);
-  static XWalkContentsClientBridgeBase* FromRenderFrameID(int render_process_id,
-                                            int render_frame_id);
-  static XWalkContentsClientBridgeBase* FromRenderFrameHost(
-      content::RenderFrameHost* render_frame_host);
+//  static void Associate(content::WebContents* web_contents,
+//                        XWalkContentsClientBridgeBase* handler);
+//  static XWalkContentsClientBridgeBase* FromWebContents(
+//      content::WebContents* web_contents);
+//  static XWalkContentsClientBridgeBase* FromRenderViewID(int render_process_id,
+//                                            int render_view_id);
+//  static XWalkContentsClientBridgeBase* FromRenderFrameID(int render_process_id,
+//                                            int render_frame_id);
+//  static XWalkContentsClientBridgeBase* FromRenderFrameHost(
+//      content::RenderFrameHost* render_frame_host);
 
   virtual ~XWalkContentsClientBridgeBase();
 
@@ -57,11 +58,10 @@ class XWalkContentsClientBridgeBase {
   virtual void AllowCertificateError(int cert_error,
                                      net::X509Certificate* cert,
                                      const GURL& request_url,
-                                     const base::Callback<void(bool)>& callback,
-                                     bool* cancel_request) = 0;
+                                     const base::Callback<void(content::CertificateRequestResultType)>& callback) = 0;
 
   virtual void RunJavaScriptDialog(
-      content::JavaScriptMessageType message_type,
+      content::JavaScriptDialogType dialog_type,
       const GURL& origin_url,
       const base::string16& message_text,
       const base::string16& default_prompt_text,
@@ -74,7 +74,6 @@ class XWalkContentsClientBridgeBase {
   virtual void ShowNotification(
       const content::PlatformNotificationData& notification_data,
       const content::NotificationResources& notification_resources,
-      std::unique_ptr<content::DesktopNotificationDelegate> delegate,
       base::Closure* cancel_callback)
       = 0;
   virtual void OnWebLayoutPageScaleFactorChanged(float page_scale_factor) = 0;
@@ -82,6 +81,15 @@ class XWalkContentsClientBridgeBase {
                                         bool has_user_gesture,
                                         bool is_redirect,
                                         bool is_main_frame) = 0;
+  /**
+   * Last chance to rewrite request url, right before WebKit makes the request
+   *
+   * @param new_url the rewritten url (return true if rewritten!)
+   * @return true if new_url has been assigned a new value
+   */
+  virtual bool RewriteUrlIfNeeded(const std::string& url,
+                               ui::PageTransition transition_type,
+                               std::string* new_url) = 0;
 };
 
 }  // namespace xwalk

@@ -19,20 +19,20 @@ class RuntimeJavaScriptDialogManager : public content::JavaScriptDialogManager {
   void RunJavaScriptDialog(
       content::WebContents* web_contents,
       const GURL& origin_url,
-      content::JavaScriptMessageType javascript_message_type,
+      content::JavaScriptDialogType javascript_dialog_type,
       const base::string16& message_text,
       const base::string16& default_prompt_text,
-      const DialogClosedCallback& callback,
+      DialogClosedCallback callback,
       bool* did_suppress_message) override;
 
   void RunBeforeUnloadDialog(
       content::WebContents* web_contents,
+      content::RenderFrameHost* render_frame_host,
       bool is_reload,
-      const DialogClosedCallback& callback) override;
-  void CancelActiveAndPendingDialogs(
-      content::WebContents* web_contents) override;
-  void ResetDialogState(
-      content::WebContents* web_contents) override;
+      DialogClosedCallback callback) override;
+  void CancelDialogs(
+      content::WebContents* web_contents,
+      bool reset_state) override;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(RuntimeJavaScriptDialogManager);

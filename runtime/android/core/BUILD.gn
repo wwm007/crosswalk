@@ -9,6 +9,8 @@ import("//xwalk/build/android/generate_android_project.gni")
 import("//xwalk/build/android/maven_pom.gni")
 import("//xwalk/build/version.gni")
 import("//xwalk/runtime/android/core_internal/chromium_java_deps.gni")
+import("//base/android/jni_generator/jni_exception_list.gni")
+import("//xwalk/build/tenta.gni") 
 
 declare_args() {
   # Name of Crosswalk Maven artifacts used to generate their respective POM
@@ -19,11 +21,22 @@ declare_args() {
 
 android_library("xwalk_core_java") {
   deps = [
+    "//base:base_java",
     ":xwalk_core_java_resources",
     "//xwalk/runtime/android/core_internal:xwalk_core_reflection_layer_gen",
     "//xwalk/third_party/lzma_sdk:lzma_sdk_java",
-    "//xwalk/third_party/tenta/meta_fs/java:meta_fs_java",
   ]
+  if (tenta_chromium_build) {
+    deps += [
+      "//xwalk/third_party/tenta/meta_fs/java:meta_fs_java",
+      "//xwalk/third_party/tenta/chromium_cache:chromium_cache_java",
+      "//xwalk/third_party/tenta/crosswalk_extensions/java:crosswalk_extensions_java",
+    ]
+  } else {
+    deps += [
+      "//xwalk/runtime/android/empty_tenta:tenta_empty_java",
+    ]
+  }
   srcjars =
       [ "$root_gen_dir/xwalk_core_reflection_layer/wrapper/wrapper.srcjar" ]
   java_files = [
@@ -60,6 +73,17 @@ android_library("xwalk_core_java") {
     "src/org/xwalk/core/XWalkMixedResources.java",
     "src/org/xwalk/core/XWalkUpdater.java",
   ]
+                                        # New versions of BuildConfig.java and NativeLibraries.java
+#     # (with the actual correct values) will be created when creating an apk.
+  jar_excluded_patterns = [
+#       "*/BuildConfig.class",
+#       "*/NativeLibraries.class",
+#       "*/NativeLibraries##*.class",
+      "*/R.class",
+      "*/R\$*.class",
+      "*/Manifest.class",
+      "*/Manifest\$*.class",
+    ]
 }
 
 android_resources("xwalk_core_java_resources") {
@@ -82,6 +106,8 @@ generate_android_project("xwalk_core_library") {
       "//xwalk/runtime/android/core_internal_empty/AndroidManifest.xml"
   deps = [
     ":xwalk_core_java",
+#     ":xwalk_build_config_gen",
+#     ":xwalk_native_libraries_gen",
     "//base:base_java",
     "//third_party/icu:icudata",
     "//xwalk/resources:xwalk_pak",
@@ -105,12 +131,26 @@ generate_android_project("xwalk_core_library") {
   # TODO(rakuco): Check if we should fix the manifest instead.
   resource_excluded_patterns = [
     "*/org/xwalk/core/R.class",
-    "*/org/xwalk/core/R##*.class",
-    "*/org/xwalk/core/library/empty/R.class",
-    "*/org/xwalk/core/library/empty/R##*.class",
+    "*/org/xwalk/core/R\$*.class",
+    "*/org/xwalk/core/Manifest.class",
+    "*/org/xwalk/core/Manifest\$*.class",
+    "*/android/support/*/R.class",
+    "*/android/support/*/R\$*.class",
+    "*/android/support/*/Manifest.class",
+    "*/android/support/*/Manifest\$*.class",
+    "*/com/google/android/*/R.class",
+    "*/com/google/android/*/R\$*.class",
+    "*/android/arch/*/R.class",
+    "*/android/arch/*/R\$*.class",
   ]
+#   resource_excluded_patterns = [
+#     "*/R.class",
+#     "*/R\$*.class",
+#     "*/Manifest.class",
+#     "*/Manifest\$*.class",
+#   ]
+  
   shared_libraries = [
-    "//xwalk/runtime/android/dummy_lib:libxwalkdummy",
     "//xwalk/runtime/app/android:libxwalkcore",
   ]
   template_dir = "//xwalk/build/android/xwalkcore_library_template"
@@ -120,12 +160,47 @@ generate_android_project("xwalk_core_library") {
   }
 
   if (v8_use_external_startup_data) {
-    binary_files += [
+    asset_sources = [
       "$root_out_dir/natives_blob.bin",
       "$root_out_dir/snapshot_blob.bin",
     ]
     deps += [ "//v8" ]
   }
+  
+#   # New versions of BuildConfig.java and NativeLibraries.java
+#   # (with the actual correct values) will be created when creating an apk.
+#   jar_excluded_patterns = [
+#     "*/BuildConfig.class",
+#     "*/NativeLibraries.class",
+#     "*/NativeLibraries##*.class",
+#   ]
+
+}
+
+java_cpp_template("xwalk_build_config_gen") {
+  sources = [
+    "//base/android/java/templates/BuildConfig.template",
+  ]
+  package_path = "org/chromium/base"
+
+  defines = []
+  if (is_java_debug || dcheck_always_on) {
+    defines += [ "_DCHECK_IS_ON" ]
+  }
+}
+
+java_cpp_template("xwalk_native_libraries_gen") {
+  sources = [
+    "//base/android/java/templates/NativeLibraries.template",
+  ]
+  package_path = "org/chromium/base/library_loader"
+}
+
+generate_jni_registration("xwalk_jni_registration") {
+  target = ":xwalk_core_library"
+  output = "$target_gen_dir/${target_name}.h"
+  exception_files = jni_exception_files
+  print("ohoooooooooo register natives! out=", output)
 }
 
 generate_android_project("xwalk_shared_library") {
@@ -160,11 +235,17 @@ generate_android_project("xwalk_shared_library") {
   # org.xwalk.core.R.
   # TODO(rakuco): Check if we should fix the manifest instead.
   resource_excluded_patterns = [
-    "*/org/xwalk/core/R.class",
-    "*/org/xwalk/core/R##*.class",
-    "*/org/xwalk/core/library/empty/R.class",
-    "*/org/xwalk/core/library/empty/R##*.class",
+    "*/R.class",
+    "*/R\$*.class",
+    "*/Manifest.class",
+    "*/Manifest\$*.class",
   ]
+                                                    # (with the actual correct values) will be created when creating an apk.
+#   jar_excluded_patterns = [
+#     "*/BuildConfig.class",
+#     "*/NativeLibraries.class",
+#     "*/NativeLibraries##*.class",
+#   ]
   template_dir = "//xwalk/build/android/xwalk_shared_library_template"
 }
 

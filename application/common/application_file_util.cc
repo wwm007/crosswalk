@@ -298,12 +298,13 @@ base::DictionaryValue* LoadXMLNode(
 
   for (xmlNode* node = root->children; node; node = node->next) {
     std::string sub_node_name(ToConstCharPointer(node->name));
-    base::DictionaryValue* sub_value = LoadXMLNode(node, current_dir);
+    //base::DictionaryValue* sub_value = LoadXMLNode(node, current_dir);
+    std::unique_ptr<base::DictionaryValue> sub_value(LoadXMLNode(node, current_dir));
     if (!sub_value)
       continue;
 
     if (!value->HasKey(sub_node_name)) {
-      value->Set(sub_node_name, sub_value);
+      value->Set(sub_node_name, std::move(sub_value));
       continue;
     } else if (IsSingletonElement(sub_node_name)) {
       continue;
@@ -313,20 +314,21 @@ base::DictionaryValue* LoadXMLNode(
     value->Get(sub_node_name, &temp);
     DCHECK(temp);
 
-    if (temp->IsType(base::Value::TYPE_LIST)) {
+    if (temp->IsType(base::Value::Type::LIST)) {
       base::ListValue* list;
       temp->GetAsList(&list);
-      list->Append(sub_value);
+      list->Append(std::move(sub_value));
     } else {
-      DCHECK(temp->IsType(base::Value::TYPE_DICTIONARY));
+      DCHECK(temp->IsType(base::Value::Type::DICTIONARY));
       base::DictionaryValue* dict;
       temp->GetAsDictionary(&dict);
-      base::DictionaryValue* prev_value = dict->DeepCopy();
+//      base::DictionaryValue* prev_value = dict->DeepCopy();
+      std::unique_ptr<base::DictionaryValue> prev_value(dict);
 
-      base::ListValue* list = new base::ListValue();
-      list->Append(prev_value);
-      list->Append(sub_value);
-      value->Set(sub_node_name, list);
+      std::unique_ptr<base::ListValue> list(new base::ListValue());
+      list->Append(std::move(prev_value));
+      list->Append(std::move(sub_value));
+      value->Set(sub_node_name, std::move(list));
     }
   }
 
@@ -375,7 +377,7 @@ std::unique_ptr<Manifest> LoadManifest<Manifest::TYPE_MANIFEST>(
     return std::unique_ptr<Manifest>();
   }
 
-  if (!root->IsType(base::Value::TYPE_DICTIONARY)) {
+  if (!root->IsType(base::Value::Type::DICTIONARY)) {
     *error = base::StringPrintf("%s", errors::kManifestUnreadable);
     return std::unique_ptr<Manifest>();
   }
@@ -397,10 +399,10 @@ std::unique_ptr<Manifest> LoadManifest<Manifest::TYPE_WIDGET>(
     return std::unique_ptr<Manifest>();
   }
   root_node = xmlDocGetRootElement(doc);
-  base::DictionaryValue* dv = LoadXMLNode(root_node);
+  std::unique_ptr<base::DictionaryValue> dv(LoadXMLNode(root_node));
   std::unique_ptr<base::DictionaryValue> result(new base::DictionaryValue);
   if (dv)
-    result->Set(ToConstCharPointer(root_node->name), dv);
+    result->Set(ToConstCharPointer(root_node->name), std::move(dv));
 
   return base::WrapUnique(new Manifest(std::move(result),
                                       Manifest::TYPE_WIDGET));

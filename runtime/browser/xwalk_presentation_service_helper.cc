@@ -105,7 +105,9 @@ void DisplayInfoManager::UpdateInfoList() {
 }
 
 void DisplayInfoManager::NotifyInfoChanged() {
-  FOR_EACH_OBSERVER(Observer, observers_, OnDisplayInfoChanged(info_list_));
+  for ( auto& observer : observers_ ) {
+    observer.OnDisplayInfoChanged(info_list_);
+  }
 }
 
 PresentationSession::PresentationSession(const std::string& presentation_url,
@@ -113,7 +115,7 @@ PresentationSession::PresentationSession(const std::string& presentation_url,
                                          const SystemString& display_id)
     : render_process_id_(-1),
       render_frame_id_(-1),
-      session_info_(presentation_url, presentation_id),
+      session_info_(GURL(presentation_url), presentation_id),
       display_id_(display_id),
       weak_factory_(this) {}
 
@@ -126,8 +128,9 @@ PresentationSession::CreateParams::CreateParams()
       render_frame_id(-1) {}
 
 void PresentationSession::NotifyClose() {
-  FOR_EACH_OBSERVER(Observer, observers_,
-                    OnPresentationSessionClosed(session_info_));
+  for ( auto& observer : observers_ ) {
+    observer.OnPresentationSessionClosed(session_info_);
+  }
 }
 
 std::unique_ptr<PresentationFrame> PresentationFrame::Create(
@@ -185,16 +188,25 @@ void PresentationFrame::OnPresentationSessionClosed(
 void PresentationFrame::OnDisplayInfoChanged(
     const std::vector<DisplayInfo>& info_list) {
   if (screen_listener_) {
-    if (auto presentation_session = this->session()) {
+    PresentationSession * presentation_session = this->session();
+    if (presentation_session != nullptr ) {
       // When system display is changed (e.g. rotated),
       // check if it the display owned by me is still available
       auto my_display_id = presentation_session->display_id();
       bool still_available =
           DisplayInfoManager::GetInstance()->IsStillAvailable(my_display_id);
-      screen_listener_->OnScreenAvailabilityChanged(still_available);
-    } else {
       screen_listener_->OnScreenAvailabilityChanged(
-          DisplayInfoManager::GetInstance()->FindAvailable() != nullptr);
+          still_available ?
+              blink::mojom::ScreenAvailability::AVAILABLE :
+              blink::mojom::ScreenAvailability::UNAVAILABLE);
+    } else {
+      bool available = DisplayInfoManager::GetInstance()->FindAvailable()
+          != nullptr;
+
+      screen_listener_->OnScreenAvailabilityChanged(
+          available ?
+              blink::mojom::ScreenAvailability::AVAILABLE :
+              blink::mojom::ScreenAvailability::UNAVAILABLE);
     }
   }
 
@@ -220,8 +232,13 @@ bool PresentationFrame::SetScreenAvailabilityListener(
 
   screen_listener_ = listener;
   if (screen_listener_) {
+    bool available = DisplayInfoManager::GetInstance()->FindAvailable()
+        != nullptr;
+
     screen_listener_->OnScreenAvailabilityChanged(
-        DisplayInfoManager::GetInstance()->FindAvailable() != nullptr);
+        available ?
+            blink::mojom::ScreenAvailability::AVAILABLE :
+            blink::mojom::ScreenAvailability::UNAVAILABLE);
   }
   return true;
 }

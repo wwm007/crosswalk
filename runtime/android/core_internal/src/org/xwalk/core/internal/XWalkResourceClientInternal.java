@@ -258,6 +258,17 @@ public class XWalkResourceClientInternal {
     public boolean shouldOverrideUrlLoading(XWalkViewInternal view, String url) {
         return false;
     }
+    
+    /**
+     * Can rewrite url just before load
+     * @param view
+     * @param rewriteValue Storage for old and new url
+     * @return true if url was rewritten 
+     */
+    @XWalkAPI
+    public boolean onRewriteUrlIfNeeded(XWalkViewInternal view, RewriteUrlValueInternal rewriteValue) {
+        return false;
+    }
 
     /**
       * Notify the host application that an SSL error occurred while loading a

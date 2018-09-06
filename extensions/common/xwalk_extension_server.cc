@@ -29,7 +29,6 @@ XWalkExtensionServer::XWalkExtensionServer()
 
 XWalkExtensionServer::~XWalkExtensionServer() {
   DeleteInstanceMap();
-  STLDeleteValues(&extensions_);
 }
 
 bool XWalkExtensionServer::OnMessageReceived(const IPC::Message& message) {
@@ -50,6 +49,10 @@ bool XWalkExtensionServer::OnMessageReceived(const IPC::Message& message) {
   IPC_END_MESSAGE_MAP()
 
   return handled;
+}
+
+void XWalkExtensionServer::OnChannelConnected(int32_t peer_pid) {
+  _peer_pid = peer_pid;
 }
 
 void XWalkExtensionServer::OnCreateInstance(int64_t instance_id,
@@ -168,7 +171,8 @@ bool XWalkExtensionServer::RegisterExtension(
     return false;
   }
 
-  if (ContainsKey(extension_symbols_, extension->name())) {
+  auto it = extension_symbols_.find(extension->name());
+  if (it != extension_symbols_.end()) {
 #if TENTA_LOG_ENABLE == 1
     LOG(WARNING) << "Ignoring extension with name already registered: "
                  << extension->name();
@@ -192,19 +196,21 @@ bool XWalkExtensionServer::RegisterExtension(
 
   std::string name = extension->name();
   extension_symbols_.insert(name);
-  extensions_[name] = extension.release();
+  extensions_[name] = std::move(extension);
   return true;
 }
 
 bool XWalkExtensionServer::ContainsExtension(
     const std::string& extension_name) const {
-  return ContainsKey(extensions_, extension_name);
+  auto it = extensions_.find(extension_name);
+
+  return it != extensions_.end();
 }
 
 void XWalkExtensionServer::PostMessageToJSCallback(
     int64_t instance_id, std::unique_ptr<base::Value> msg) {
   base::ListValue wrapped_msg;
-  wrapped_msg.Append(msg.release());
+  wrapped_msg.Append(std::move(msg));
 
   std::unique_ptr<IPC::Message> message(
       new XWalkExtensionClientMsg_PostMessageToJS(instance_id, wrapped_msg));
@@ -227,13 +233,10 @@ void XWalkExtensionServer::PostMessageToJSCallback(
 
   memcpy(shared_memory.memory(), message->data(), message->size());
 
-  base::SharedMemoryHandle handle;
-  base::Process process =
-      base::Process::OpenWithExtraPrivileges(channel_proxy_->GetPeerPID());
-  CHECK(process.IsValid());
-  if (!shared_memory.GiveReadOnlyToProcess(process.Handle(), &handle)) {
+  base::SharedMemoryHandle handle = shared_memory.GetReadOnlyHandle();
+  if ( !handle.IsValid() ) {
 #if TENTA_LOG_ENABLE == 1
-    LOG(WARNING) << "Can't share memory handle to send out of line message";
+    LOG(WARNING) << __func__ <<  " Can't share memory handle to send out of line message";
 #endif
     return;
   }
@@ -264,7 +267,7 @@ void XWalkExtensionServer::SendSyncReplyToJSCallback(
   }
 
   base::ListValue wrapped_reply;
-  wrapped_reply.Append(reply.release());
+  wrapped_reply.Append(std::move(reply));
   XWalkExtensionServerMsg_SendSyncMessageToNative::WriteReplyParams(
       data.pending_reply, wrapped_reply);
   Send(data.pending_reply);
@@ -300,7 +303,8 @@ bool XWalkExtensionServer::ValidateExtensionEntryPoints(
     if (!ValidateExtensionIdentifier(entry_point))
       return false;
 
-    if (ContainsKey(extension_symbols_, entry_point)) {
+    auto it = extension_symbols_.find(entry_point);
+    if (it != extension_symbols_.end()) {
 #if TENTA_LOG_ENABLE == 1
       LOG(WARNING) << "Entry point '" << entry_point
                    << "' clashes with another extension entry point.";
@@ -369,7 +373,7 @@ void XWalkExtensionServer::OnGetExtensions(
   ExtensionMap::iterator it = extensions_.begin();
   for (; it != extensions_.end(); ++it) {
     XWalkExtensionServerMsg_ExtensionRegisterParams extension_parameters;
-    XWalkExtension* extension = it->second;
+    XWalkExtension* extension = it->second.get();
 
     extension_parameters.name = extension->name();
     extension_parameters.js_api = extension->javascript_api();
@@ -401,7 +405,7 @@ base::FilePath::StringType GetNativeLibraryPattern() {
 
 std::vector<std::string> RegisterExternalExtensionsInDirectory(
     XWalkExtensionServer* server, const base::FilePath& dir,
-    std::unique_ptr<base::DictionaryValue::Storage> runtime_variables) {
+    std::unique_ptr<base::DictionaryValue::DictStorage> runtime_variables) {
   CHECK(server);
 
   std::vector<std::string> registered_extensions;
@@ -426,7 +430,7 @@ std::vector<std::string> RegisterExternalExtensionsInDirectory(
     // as an identifier in case you have symlinks to extensions to force it
     // load multiple times.
     (*runtime_variables)["extension_path"] = base::WrapUnique(
-        new base::StringValue(extension_path.AsUTF8Unsafe()));
+        new base::Value(extension_path.AsUTF8Unsafe()));
 
     extension->set_runtime_variables(runtime_variables.get());
     if (server->permissions_delegate())

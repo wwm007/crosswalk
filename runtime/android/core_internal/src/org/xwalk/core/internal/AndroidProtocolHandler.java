@@ -16,7 +16,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLConnection;
 import java.util.List;
+import java.util.Locale;
 
+import org.chromium.base.ContextUtils;
 import org.chromium.base.annotations.CalledByNative;
 import org.chromium.base.annotations.JNINamespace;
 
@@ -43,12 +45,13 @@ class AndroidProtocolHandler {
      * @return An InputStream to the Android resource.
      */
     @CalledByNative
-    public static InputStream open(Context context, String url) {
+    public static InputStream open(String url) {
         Uri uri = verifyUrl(url);
         if (uri == null) {
             return null;
         }
         try {
+            Context context = ContextUtils.getApplicationContext();
             String path = uri.getPath();
             if (uri.getScheme().equals(FILE_SCHEME)) {
                 if (path.startsWith(nativeGetAndroidAssetPath())) {
@@ -61,7 +64,7 @@ class AndroidProtocolHandler {
             } else if (uri.getScheme().equals(APP_SCHEME)) {
                 // The host should be the same as the lower case of the package
                 // name, otherwise the resource request should be rejected.
-                if (!uri.getHost().equals(context.getPackageName().toLowerCase())) return null;
+                if (!uri.getHost().equals(context.getPackageName().toLowerCase(Locale.getDefault()))) return null;
 
                 // path == "/" or path == ""
                 if (path.length() <= 1) return null;
@@ -102,7 +105,7 @@ class AndroidProtocolHandler {
     }
 
     static String getUrlContent(Context context, String url) throws IOException {
-        InputStream stream = open(context, url);
+        InputStream stream = open(url);
         if (stream == null) {
             throw new RuntimeException("Failed to open the url: " + url);
         }
@@ -219,12 +222,13 @@ class AndroidProtocolHandler {
      * @return The mime type or null if the type is unknown.
      */
     @CalledByNative
-    public static String getMimeType(Context context, InputStream stream, String url) {
+    public static String getMimeType(InputStream stream, String url) {
         Uri uri = verifyUrl(url);
         if (uri == null) {
             return null;
         }
         try {
+            Context context = ContextUtils.getApplicationContext();
             String path = uri.getPath();
             // The content URL type can be queried directly.
             if (uri.getScheme().equals(CONTENT_SCHEME)) {
@@ -256,11 +260,11 @@ class AndroidProtocolHandler {
      * @return Package name.
      */
     @CalledByNative
-    public static String getPackageName(Context context) {
+    public static String getPackageName() {
         try {
             // Make sure the context is the application context.
             // Or it will get the wrong package name in shared mode.
-            return context.getPackageName();
+            return ContextUtils.getApplicationContext().getPackageName();
         } catch (Exception ex) {
             Log.e(TAG, "Unable to get package name");
             return null;

@@ -1,6 +1,7 @@
 # Copyright (c) 2016 Intel Corporation. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+import("//xwalk/build/tenta.gni")
 
 shared_library("libxwalkcore") {
   sources = [
@@ -9,7 +10,7 @@ shared_library("libxwalkcore") {
     "xwalk_jni_registrar.h",
   ]
   deps = [
-    "//components/auto_login_parser",
+#    "//components/auto_login_parser",
     "//components/cdm/browser",
     "//components/cdm/renderer",
     "//components/navigation_interception",
@@ -19,8 +20,15 @@ shared_library("libxwalkcore") {
     "//mojo/public/cpp/bindings",
     "//skia",
     "//xwalk:xwalk_runtime",
+    "//xwalk/runtime/android/core:xwalk_jni_registration",
     "//xwalk/extensions/android:xwalk_core_extensions_native_jni",
     "//xwalk/runtime/android/core_internal:xwalk_core_jar_jni",
     "//xwalk/runtime/android/core_internal:xwalk_core_native_jni",
   ]
+  if (tenta_chromium_build) {
+    deps += [
+      "//xwalk/third_party/tenta/meta_fs",
+      "//xwalk/third_party/tenta/crosswalk_extensions",
+    ]
+  }
 }

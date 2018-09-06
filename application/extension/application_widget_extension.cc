@@ -91,7 +91,7 @@ ApplicationWidgetExtension::ApplicationWidgetExtension(
   entries.push_back("window.Widget");
   set_entry_points(entries);
 
-  set_javascript_api(ResourceBundle::GetSharedInstance().GetRawDataResource(
+  set_javascript_api(ui::ResourceBundle::GetSharedInstance().GetRawDataResource(
       IDR_XWALK_APPLICATION_WIDGET_API).as_string());
 }
 
@@ -128,11 +128,11 @@ void AppWidgetExtensionInstance::HandleSyncMessage(
 
   if (!msg->GetAsDictionary(&dict) || !dict->GetString(kCommandKey, &command)) {
     LOG(ERROR) << "Fail to handle command sync message.";
-    SendSyncReplyToJS(std::unique_ptr<base::Value>(new base::StringValue("")));
+    SendSyncReplyToJS(std::unique_ptr<base::Value>(new base::Value("")));
     return;
   }
 
-  std::unique_ptr<base::Value> result(new base::StringValue(""));
+  std::unique_ptr<base::Value> result(new base::Value(""));
   if (command == "GetWidgetInfo") {
     result = GetWidgetInfo(std::move(msg));
   } else if (command == "SetPreferencesItem") {
@@ -154,9 +154,9 @@ void AppWidgetExtensionInstance::HandleSyncMessage(
   SendSyncReplyToJS(std::move(result));
 }
 
-std::unique_ptr<base::StringValue> AppWidgetExtensionInstance::GetWidgetInfo(
+std::unique_ptr<base::Value> AppWidgetExtensionInstance::GetWidgetInfo(
     std::unique_ptr<base::Value> msg) {
-  std::unique_ptr<base::StringValue> result(new base::StringValue(""));
+  std::unique_ptr<base::Value> result(new base::Value(""));
   std::string key;
   std::string value;
   base::DictionaryValue* dict;
@@ -172,14 +172,14 @@ std::unique_ptr<base::StringValue> AppWidgetExtensionInstance::GetWidgetInfo(
       application_->data()->GetManifestData(widget_keys::kWidgetKey));
   base::DictionaryValue* widget_info = info->GetWidgetInfo();
   widget_info->GetString(key, &value);
-  result.reset(new base::StringValue(value));
+  result.reset(new base::Value(value));
   return result;
 }
 
-std::unique_ptr<base::FundamentalValue>
+std::unique_ptr<base::Value>
 AppWidgetExtensionInstance::SetPreferencesItem(std::unique_ptr<base::Value> msg) {
-  std::unique_ptr<base::FundamentalValue> result(
-      new base::FundamentalValue(false));
+  std::unique_ptr<base::Value> result(
+      new base::Value(false));
   std::string key;
   std::string value;
   base::DictionaryValue* dict;
@@ -198,11 +198,11 @@ AppWidgetExtensionInstance::SetPreferencesItem(std::unique_ptr<base::Value> msg)
   if (old_value == value) {
     LOG(WARNING) << "You are trying to set the same value."
                  << " Nothing will be done.";
-    result.reset(new base::FundamentalValue(true));
+    result.reset(new base::Value(true));
     return result;
   }
   if (widget_storage_->AddEntry(key, value, false)) {
-    result.reset(new base::FundamentalValue(true));
+    result.reset(new base::Value(true));
 
     std::unique_ptr<base::DictionaryValue> event(new base::DictionaryValue());
     event->SetString("key", key);
@@ -214,10 +214,10 @@ AppWidgetExtensionInstance::SetPreferencesItem(std::unique_ptr<base::Value> msg)
   return result;
 }
 
-std::unique_ptr<base::FundamentalValue>
+std::unique_ptr<base::Value>
 AppWidgetExtensionInstance::RemovePreferencesItem(std::unique_ptr<base::Value> msg) {
-  std::unique_ptr<base::FundamentalValue> result(
-      new base::FundamentalValue(false));
+  std::unique_ptr<base::Value> result(
+      new base::Value(false));
   std::string key;
   base::DictionaryValue* dict;
 
@@ -231,12 +231,12 @@ AppWidgetExtensionInstance::RemovePreferencesItem(std::unique_ptr<base::Value> m
   if (!widget_storage_->GetValueByKey(key, &old_value)) {
     LOG(WARNING) << "You are trying to remove an entry which doesn't exist."
                  << " Nothing will be done.";
-    result.reset(new base::FundamentalValue(true));
+    result.reset(new base::Value(true));
     return result;
   }
 
   if (widget_storage_->RemoveEntry(key)) {
-    result.reset(new base::FundamentalValue(true));
+    result.reset(new base::Value(true));
 
     std::unique_ptr<base::DictionaryValue> event(new base::DictionaryValue());
     event->SetString("key", key);
@@ -248,10 +248,10 @@ AppWidgetExtensionInstance::RemovePreferencesItem(std::unique_ptr<base::Value> m
   return result;
 }
 
-std::unique_ptr<base::FundamentalValue> AppWidgetExtensionInstance::ClearAllItems(
+std::unique_ptr<base::Value> AppWidgetExtensionInstance::ClearAllItems(
     std::unique_ptr<base::Value> msg) {
-  std::unique_ptr<base::FundamentalValue> result(
-      new base::FundamentalValue(false));
+  std::unique_ptr<base::Value> result(
+      new base::Value(false));
 
   std::unique_ptr<base::DictionaryValue> entries(new base::DictionaryValue());
   widget_storage_->GetAllEntries(entries.get());
@@ -273,7 +273,7 @@ std::unique_ptr<base::FundamentalValue> AppWidgetExtensionInstance::ClearAllItem
     }
   }
 
-  result.reset(new base::FundamentalValue(true));
+  result.reset(new base::Value(true));
   return result;
 }
 
@@ -285,7 +285,7 @@ std::unique_ptr<base::DictionaryValue> AppWidgetExtensionInstance::GetAllItems(
   return result;
 }
 
-std::unique_ptr<base::StringValue> AppWidgetExtensionInstance::GetItemValueByKey(
+std::unique_ptr<base::Value> AppWidgetExtensionInstance::GetItemValueByKey(
     std::unique_ptr<base::Value> msg) {
   base::DictionaryValue* dict;
   msg->GetAsDictionary(&dict);
@@ -295,14 +295,14 @@ std::unique_ptr<base::StringValue> AppWidgetExtensionInstance::GetItemValueByKey
   if (!dict->GetString(kPreferencesItemKey, &key) ||
       !widget_storage_->GetValueByKey(key, &value))
     value = "";
-  std::unique_ptr<base::StringValue> result(new base::StringValue(value));
+  std::unique_ptr<base::Value> result(new base::Value(value));
   return result;
 }
 
-std::unique_ptr<base::FundamentalValue> AppWidgetExtensionInstance::KeyExists(
+std::unique_ptr<base::Value> AppWidgetExtensionInstance::KeyExists(
     std::unique_ptr<base::Value> msg) const {
-  std::unique_ptr<base::FundamentalValue> result(
-      new base::FundamentalValue(false));
+  std::unique_ptr<base::Value> result(
+      new base::Value(false));
   std::string key;
   base::DictionaryValue* dict;
 
@@ -313,7 +313,7 @@ std::unique_ptr<base::FundamentalValue> AppWidgetExtensionInstance::KeyExists(
   }
 
   if (widget_storage_->EntryExists(key))
-    result.reset(new base::FundamentalValue(true));
+    result.reset(new base::Value(true));
 
   return result;
 }
