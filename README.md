@@ -6,6 +6,9 @@ Follow instructions at https://crosswalk-project.org/contribute/building_crosswa
 and <br>
 https://crosswalk-project.org/contribute/building_crosswalk/tracking_branches.html
 
+Sample Android project with native crosswalk:
+https://github.com/ks32/CrosswalkNative
+
 
 ## Introduction
 
