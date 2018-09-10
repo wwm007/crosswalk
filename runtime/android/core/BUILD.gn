@@ -107,6 +107,7 @@ generate_android_project("xwalk_core_library") {
   # TODO(rakuco): Check if we should fix the manifest instead.
   resource_excluded_patterns = [
     "*/org/xwalk/core/R.class",
+    "*/org/xwalk/core/R*string.class",
     "*/org/xwalk/core/R##*.class",
     "*/org/xwalk/core/library/empty/R.class",
     "*/org/xwalk/core/library/empty/R##*.class",
