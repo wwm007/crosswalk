@@ -5,7 +5,7 @@
 #include "xwalk/application/renderer/application_native_module.h"
 
 #include "base/logging.h"
-#include "content/public/child/v8_value_converter.h"
+#include "content/public/renderer/v8_value_converter.h"
 #include "content/public/renderer/render_view.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
@@ -36,7 +36,7 @@ void ApplicationNativeModule::GetViewByIDCallback(
 
   blink::WebView* webview = render_view->GetWebView();
   v8::Handle<v8::Context> context =
-    webview->mainFrame()->mainWorldScriptContext();
+    webview->MainFrame()->ToWebLocalFrame()->MainWorldScriptContext();
   v8::Handle<v8::Value> window = context->Global();
   info.GetReturnValue().Set(window);
 }
@@ -44,10 +44,10 @@ void ApplicationNativeModule::GetViewByIDCallback(
 void ApplicationNativeModule::GetCurrentRoutingIDCallback(
     const v8::FunctionCallbackInfo<v8::Value>& info) {
   blink::WebLocalFrame* webframe =
-    blink::WebLocalFrame::frameForCurrentContext();
+    blink::WebLocalFrame::FrameForCurrentContext();
   DCHECK(webframe);
 
-  blink::WebView* webview = webframe->view();
+  blink::WebView* webview = webframe->View();
   DCHECK(webview);
 
   content::RenderView* render_view = content::RenderView::FromWebView(webview);

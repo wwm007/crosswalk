@@ -57,13 +57,20 @@ IdentityProvider* XWalkAutofillClient::GetIdentityProvider() {
   return nullptr;
 }
 
-rappor::RapporServiceImpl* XWalkAutofillClient::GetRapporServiceImpl() {
+//rappor::RapporServiceImpl* XWalkAutofillClient::GetRapporServiceImpl() {
+//  return nullptr;
+//}
+
+ukm::UkmRecorder* XWalkAutofillClient::GetUkmRecorder() {
   return nullptr;
 }
 
-ukm::UkmService* XWalkAutofillClient::GetUkmService() {
+autofill::AddressNormalizer* XWalkAutofillClient::GetAddressNormalizer() {
+  // TODO(iotto) : Implement
+  LOG(WARNING) << __func__ << " not_implemented";
   return nullptr;
 }
+
 
 autofill::PersonalDataManager* XWalkAutofillClient::GetPersonalDataManager() {
   return nullptr;
@@ -122,8 +129,9 @@ void XWalkAutofillClient::DidFillOrPreviewField(
     const base::string16& profile_full_name) {
 }
 
-void XWalkAutofillClient::OnFirstUserGestureObserved() {
-  NOTIMPLEMENTED();
+void XWalkAutofillClient::DidInteractWithNonsecureCreditCardInput() {
+  // TODO(iotto) : Implement
+  LOG(WARNING) << __func__ << " not_implemented";
 }
 
 bool XWalkAutofillClient::IsContextSecure() {
@@ -149,10 +157,18 @@ bool XWalkAutofillClient::ShouldShowSigninPromo() {
   return false;
 }
 
-void XWalkAutofillClient::StartSigninFlow() {
+/**
+ *
+ */
+bool XWalkAutofillClient::IsAutofillSupported() {
+  return false;
 }
 
-void XWalkAutofillClient::ShowHttpNotSecureExplanation() {
+/**
+ *
+ */
+void XWalkAutofillClient::ExecuteCommand(int id) {
+
 }
 
 void XWalkAutofillClient::Dismissed(JNIEnv* env,
@@ -192,6 +208,7 @@ void XWalkAutofillClient::ConfirmSaveCreditCardLocally(
 void XWalkAutofillClient::ConfirmSaveCreditCardToCloud(
       const autofill::CreditCard& card,
       std::unique_ptr<base::DictionaryValue> legal_message,
+      bool should_cvc_be_requested,
       const base::Closure& callback) {
   NOTIMPLEMENTED();
 }
@@ -214,6 +231,12 @@ bool XWalkAutofillClient::HasCreditCardScanFeature() {
 void XWalkAutofillClient::ScanCreditCard(
     const CreditCardScanCallback& callback) {
   NOTIMPLEMENTED();
+}
+
+autofill::SaveCardBubbleController* XWalkAutofillClient::GetSaveCardBubbleController() {
+  // TODO (iotto) check if need to implement
+  NOTIMPLEMENTED();
+  return nullptr;
 }
 
 }  // namespace xwalk

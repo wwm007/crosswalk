@@ -283,7 +283,7 @@ public class XWalkUpdater {
     private static final String ANDROID_MARKET_DETAILS = "market://details?id=";
     private static final String GOOGLE_PLAY_PACKAGE = "com.android.vending";
 
-    private static final String TAG = "XWalkLib";
+    private static final String TAG = "XWalkUpdater";
 
     private XWalkUpdateListener mUpdateListener;
     private XWalkBackgroundUpdateListener mBackgroundUpdateListener;
@@ -425,7 +425,6 @@ public class XWalkUpdater {
         }
 
         String packageName = XWalkLibraryInterface.XWALK_CORE_PACKAGE;
-        packageName = mContext.getApplicationContext().getPackageName();
         Intent intent = new Intent(Intent.ACTION_VIEW);
         intent.setData(Uri.parse(ANDROID_MARKET_DETAILS + packageName));
         List<ResolveInfo> infos = mContext.getPackageManager().queryIntentActivities(

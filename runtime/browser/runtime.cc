@@ -10,10 +10,10 @@
 #include "base/command_line.h"
 #include "base/message_loop/message_loop.h"
 #include "base/strings/utf_string_conversions.h"
-#include "base/threading/non_thread_safe.h"
 #include "components/app_modal/javascript_dialog_manager.h"
 #include "components/content_settings/core/common/content_settings.h"
 #include "components/content_settings/core/common/content_settings_types.h"
+#include "content/public/browser/keyboard_event_processing_result.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_service.h"
@@ -42,6 +42,7 @@
 #include "xwalk/runtime/browser/xwalk_runner.h"
 #include "xwalk/runtime/common/xwalk_notification_types.h"
 #include "xwalk/runtime/common/xwalk_switches.h"
+#include "meta_logging.h"
 
 #if !defined(OS_ANDROID)
 #include "xwalk/runtime/browser/runtime_ui_delegate.h"
@@ -84,7 +85,6 @@ Runtime::~Runtime() {
 }
 
 void Runtime::LoadURL(const GURL& url) {
-  LOG(INFO) << "xwalk Runtime::OpenURLFromTab " << url.spec();
   content::NavigationController::LoadURLParams params(url);
   params.transition_type = ui::PageTransitionFromInt(
       ui::PAGE_TRANSITION_TYPED |
@@ -129,7 +129,8 @@ NativeAppWindow* Runtime::window() {
 }
 
 content::RenderProcessHost* Runtime::GetRenderProcessHost() {
-  return web_contents_->GetRenderProcessHost();
+  // TODO(iotto) : Test if it's ok!
+  return web_contents_->GetMainFrame()->GetProcess();
 }
 
 //////////////////////////////////////////////////////
@@ -137,7 +138,6 @@ content::RenderProcessHost* Runtime::GetRenderProcessHost() {
 //////////////////////////////////////////////////////
 content::WebContents* Runtime::OpenURLFromTab(
     content::WebContents* source, const content::OpenURLParams& params) {
-  LOG(INFO) << "xwalk Runtime::OpenURLFromTab " << params.url.spec();
 #if defined(OS_ANDROID)
   DCHECK(params.disposition == WindowOpenDisposition::CURRENT_TAB);
   source->GetController().LoadURL(
@@ -184,7 +184,7 @@ bool Runtime::IsFullscreenForTabOrPending(
 blink::WebDisplayMode Runtime::GetDisplayMode(
     const content::WebContents* web_contents) const {
   return (ui_delegate_) ? ui_delegate_->GetDisplayMode()
-                        : blink::WebDisplayModeUndefined;
+                        : blink::kWebDisplayModeUndefined;
 }
 
 void Runtime::RequestToLockMouse(content::WebContents* web_contents,
@@ -210,16 +210,15 @@ bool Runtime::CanOverscrollContent() const {
   return false;
 }
 
-bool Runtime::PreHandleKeyboardEvent(
+content::KeyboardEventProcessingResult Runtime::PreHandleKeyboardEvent(
       content::WebContents* source,
-      const content::NativeWebKeyboardEvent& event,
-      bool* is_keyboard_shortcut) {
+      const content::NativeWebKeyboardEvent& event) {
   // Escape exits tabbed fullscreen mode.
-  if (event.windowsKeyCode == 27 && IsFullscreenForTabOrPending(source)) {
+  if (event.windows_key_code == 27 && IsFullscreenForTabOrPending(source)) {
     ExitFullscreenModeForTab(source);
-    return true;
+    return content::KeyboardEventProcessingResult::HANDLED;
   }
-  return false;
+  return content::KeyboardEventProcessingResult::NOT_HANDLED;
 }
 
 void Runtime::HandleKeyboardEvent(
@@ -316,7 +315,7 @@ void Runtime::DidUpdateFaviconURL(const std::vector<FaviconURL>& candidates) {
           &Runtime::DidDownloadFavicon, weak_ptr_factory_.GetWeakPtr()));
 }
 
-void Runtime::TitleWasSet(content::NavigationEntry* entry, bool explicit_set) {
+void Runtime::TitleWasSet(content::NavigationEntry* entry) {
   if (ui_delegate_)
     ui_delegate_->UpdateTitle(entry->GetTitle());
 }
@@ -394,6 +393,10 @@ void Runtime::LoadProgressChanged(content::WebContents* source,
                                   double progress) {
   if (ui_delegate_)
     ui_delegate_->SetLoadProgress(progress);
+}
+
+void Runtime::SetOverlayMode(bool useOverlayMode) {
+  TENTA_LOG_NET(WARNING) << __func__ << " not_implemented useOverlayMode=" << useOverlayMode;
 }
 
 bool Runtime::AddDownloadItem(content::DownloadItem* download_item,

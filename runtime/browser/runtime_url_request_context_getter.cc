@@ -17,8 +17,8 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
+#include "base/task_scheduler/post_task.h"
 #include "base/threading/sequenced_worker_pool.h"
-#include "base/threading/worker_pool.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/cookie_store_factory.h"
 #include "content/public/common/content_switches.h"
@@ -43,6 +43,7 @@
 #include "net/url_request/file_protocol_handler.h"
 #include "net/url_request/static_http_user_agent_settings.h"
 #include "net/url_request/url_request_context.h"
+#include "net/url_request/url_request_context_builder.h"
 #include "net/url_request/url_request_context_storage.h"
 #include "net/url_request/url_request_intercepting_job_factory.h"
 #include "net/url_request/url_request_interceptor.h"
@@ -51,7 +52,12 @@
 #include "xwalk/runtime/browser/runtime_network_delegate.h"
 #include "xwalk/runtime/common/xwalk_content_client.h"
 #include "xwalk/runtime/common/xwalk_switches.h"
-#include "xwalk/runtime/browser/android/net/host_resolver_tenta.h"
+#ifdef TENTA_CHROMIUM_BUILD
+#include "host_resolver_tenta.h"
+#include "xwalk/third_party/tenta/chromium_cache/chromium_cache_factory.h"
+
+namespace tenta_cache = tenta::fs::cache;
+#endif
 
 #if defined(OS_ANDROID)
 #include "net/proxy/proxy_config_service_android.h"
@@ -61,12 +67,9 @@
 #include "xwalk/runtime/browser/android/net/xwalk_cookie_store_wrapper.h"
 #include "xwalk/runtime/browser/android/net/xwalk_url_request_job_factory.h"
 #include "xwalk/runtime/browser/android/xwalk_request_interceptor.h"
-//#include "xwalk/third_party/tenta/chromium_cache/chromium_cache_factory.h"
 #endif
 
 using content::BrowserThread;
-
-//namespace tenta_cache = tenta::fs::cache;
 
 namespace xwalk {
 
@@ -104,20 +107,13 @@ class IgnoresCTPolicyEnforcer : public net::CTPolicyEnforcer {
   IgnoresCTPolicyEnforcer() = default;
   ~IgnoresCTPolicyEnforcer() override = default;
 
-  net::ct::CertPolicyCompliance DoesConformToCertPolicy(
+  net::ct::CTPolicyCompliance CheckCompliance(
       net::X509Certificate* cert,
       const net::SCTList& verified_scts,
       const net::NetLogWithSource& net_log) override {
-    return net::ct::CertPolicyCompliance::CERT_POLICY_COMPLIES_VIA_SCTS;
+    return net::ct::CTPolicyCompliance::CT_POLICY_COMPLIES_VIA_SCTS;
   }
 
-  net::ct::EVPolicyCompliance DoesConformToCTEVPolicy(
-      net::X509Certificate* cert,
-      const net::ct::EVCertsWhitelist* ev_whitelist,
-      const net::SCTList& verified_scts,
-      const net::NetLogWithSource& net_log) override {
-    return net::ct::EVPolicyCompliance::EV_POLICY_DOES_NOT_APPLY;
-  }
 };
 
 }  // namespace
@@ -160,8 +156,7 @@ RuntimeURLRequestContextGetter::RuntimeURLRequestContextGetter(
   // must synchronously run on the glib message loop. This will be passed to
   // the URLRequestContextStorage on the IO thread in GetURLRequestContext().
 #if defined(OS_ANDROID)
-  proxy_config_service_ = net::ProxyService::CreateSystemProxyConfigService(
-      io_task_runner, file_task_runner);
+  proxy_config_service_ = net::ProxyService::CreateSystemProxyConfigService(io_task_runner);
   net::ProxyConfigServiceAndroid* android_config_service =
       static_cast<net::ProxyConfigServiceAndroid*>(proxy_config_service_.get());
   android_config_service->set_exclude_pac_url(true);
@@ -202,6 +197,7 @@ net::URLRequestContext* RuntimeURLRequestContextGetter::GetURLRequestContext() {
     auto cookie_store = content::CreateCookieStore(cookie_config);
     storage_->set_cookie_store(std::move(cookie_store));
 #endif
+    //TODO(iotto) : Implement safe ChannelIDStore
     storage_->set_channel_id_service(
         base::WrapUnique(
             new net::ChannelIDService(new net::DefaultChannelIDStore(NULL))));
@@ -210,17 +206,32 @@ net::URLRequestContext* RuntimeURLRequestContextGetter::GetURLRequestContext() {
             new net::StaticHttpUserAgentSettings("en-us,en",
                                                  xwalk::GetUserAgent())));
 
+#ifdef TENTA_CHROMIUM_BUILD
+    std::unique_ptr<tenta_cache::ChromiumCacheFactory> main_backend(new tenta_cache::ChromiumCacheFactory());
+
+    //TODO (iotto): Remove backup, needed for speed comparison
+    // or use when we'll have option for native host resolver
     std::unique_ptr<net::HostResolver> backup =
-        net::HostResolver::CreateDefaultResolver(NULL);
+    net::HostResolver::CreateDefaultResolver(NULL);
 
-    //tenta::HostResolverTenta * hrt = new tenta::HostResolverTenta(
-    //    std::move(backup));
-    //hrt->use_backup(false);
+    tenta::ext::HostResolverTenta * hrt = new tenta::ext::HostResolverTenta(
+        std::move(backup));
+    hrt->use_backup(false);
 
-    //std::unique_ptr<net::HostResolver> host_resolver(hrt);
+    std::unique_ptr<net::HostResolver> host_resolver(hrt);
 
-    std::unique_ptr<net::HostResolver> host_resolver(
-        net::HostResolver::CreateDefaultResolver(NULL));
+#else
+    base::FilePath cache_path = base_path_.Append(FILE_PATH_LITERAL("Cache"));
+
+    std::unique_ptr<net::HttpCache::DefaultBackend> main_backend(
+        new net::HttpCache::DefaultBackend(
+            net::DISK_CACHE, net::CACHE_BACKEND_DEFAULT, cache_path,
+            GetDiskCacheSize()));
+
+    std::unique_ptr<net::MappedHostResolver> host_resolver(
+        new net::MappedHostResolver(
+            net::HostResolver::CreateDefaultResolver(nullptr)));
+#endif
 
     storage_->set_cert_verifier(net::CertVerifier::CreateDefault());
     storage_->set_transport_security_state(
@@ -259,50 +270,42 @@ net::URLRequestContext* RuntimeURLRequestContextGetter::GetURLRequestContext() {
         std::unique_ptr < net::HttpServerProperties
             > (new net::HttpServerPropertiesImpl));
 
-    base::FilePath cache_path = base_path_.Append(FILE_PATH_LITERAL("Cache"));
-   // std::unique_ptr<tenta_cache::ChromiumCacheFactory> tenta_backend(new tenta_cache::ChromiumCacheFactory());
-
-    std::unique_ptr<net::HttpCache::DefaultBackend> main_backend(
-        new net::HttpCache::DefaultBackend(
-            net::DISK_CACHE, net::CACHE_BACKEND_DEFAULT, cache_path,
-            GetDiskCacheSize(),
-            BrowserThread::GetTaskRunnerForThread(BrowserThread::CACHE)));
-
     net::HttpNetworkSession::Params network_session_params;
-    network_session_params.cert_verifier =
+    net::HttpNetworkSession::Context network_session_context;
+
+    network_session_context.cert_verifier =
         url_request_context_->cert_verifier();
-    network_session_params.transport_security_state = url_request_context_
+    network_session_context.transport_security_state = url_request_context_
         ->transport_security_state();
-    network_session_params.cert_transparency_verifier = url_request_context_
+    network_session_context.cert_transparency_verifier = url_request_context_
         ->cert_transparency_verifier();
-    network_session_params.ct_policy_enforcer = url_request_context_
+    network_session_context.ct_policy_enforcer = url_request_context_
         ->ct_policy_enforcer();
-    network_session_params.channel_id_service = url_request_context_
+    network_session_context.channel_id_service = url_request_context_
         ->channel_id_service();
-    network_session_params.proxy_service =
+    network_session_context.proxy_service =
         url_request_context_->proxy_service();
-    network_session_params.ssl_config_service = url_request_context_
+    network_session_context.ssl_config_service = url_request_context_
         ->ssl_config_service();
-    network_session_params.http_auth_handler_factory = url_request_context_
+    network_session_context.http_auth_handler_factory = url_request_context_
         ->http_auth_handler_factory();
-    network_session_params.http_server_properties = url_request_context_
+    network_session_context.http_server_properties = url_request_context_
         ->http_server_properties();
     network_session_params.ignore_certificate_errors =
         ignore_certificate_errors_;
 
     // Give |storage_| ownership at the end in case it's |mapped_host_resolver|.
     storage_->set_host_resolver(std::move(host_resolver));
-    network_session_params.host_resolver =
+    network_session_context.host_resolver =
         url_request_context_->host_resolver();
 
     storage_->set_http_network_session(
-        base::WrapUnique(new net::HttpNetworkSession(network_session_params)));
+        base::WrapUnique(new net::HttpNetworkSession(network_session_params, network_session_context)));
     storage_->set_http_transaction_factory(
         base::WrapUnique(
             new net::HttpCache(storage_->http_network_session(),
-//                               std::move(tenta_backend),
                                std::move(main_backend),
-                               false /* set_up_quic_server_info */)));
+                               true /* is_main_cache; set_up_quic_server_info */)));
 #if defined(OS_ANDROID)
     std::unique_ptr<XWalkURLRequestJobFactory> job_factory_impl(
         new XWalkURLRequestJobFactory);
@@ -329,12 +332,8 @@ net::URLRequestContext* RuntimeURLRequestContextGetter::GetURLRequestContext() {
         url::kDataScheme, base::WrapUnique(new net::DataProtocolHandler));
     DCHECK(set_protocol);
     set_protocol = job_factory_impl->SetProtocolHandler(
-        url::kFileScheme,
-        base::WrapUnique(
-            new net::FileProtocolHandler(
-                content::BrowserThread::GetBlockingPool()
-                    ->GetTaskRunnerWithShutdownBehavior(
-                    base::SequencedWorkerPool::SKIP_ON_SHUTDOWN))));
+        url::kFileScheme, base::WrapUnique(new net::FileProtocolHandler(base::CreateSequencedTaskRunnerWithTraits( {
+            base::TaskShutdownBehavior::SKIP_ON_SHUTDOWN }))));
     DCHECK(set_protocol);
 
     // Step 3:

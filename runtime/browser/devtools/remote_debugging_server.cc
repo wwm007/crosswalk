@@ -94,13 +94,18 @@ XWalkDevToolsHttpHandlerDelegate::~XWalkDevToolsHttpHandlerDelegate() {
 }
 
 std::string XWalkDevToolsHttpHandlerDelegate::GetDiscoveryPageHTML() {
-  return ResourceBundle::GetSharedInstance().GetRawDataResource(
+  return ui::ResourceBundle::GetSharedInstance().GetRawDataResource(
       IDR_DEVTOOLS_FRONTEND_PAGE_HTML).as_string();
 }
 
 std::string XWalkDevToolsHttpHandlerDelegate::GetFrontendResource(
     const std::string& path) {
+#if defined(OS_ANDROID)
+  return std::string();
+#else
   return content::DevToolsFrontendHost::GetFrontendResource(path).as_string();
+#endif
+
 }
 /*
 std::string XWalkDevToolsHttpHandlerDelegate::GetPageThumbnailData(
@@ -164,9 +169,8 @@ RemoteDebuggingServer::RemoteDebuggingServer(
           std::move(factory),
           frontend_url,
           output_dir,
-          output_dir,
-          std::string(),
-          xwalk::GetUserAgent()));
+          output_dir));
+
   port_ = port;
 }
 

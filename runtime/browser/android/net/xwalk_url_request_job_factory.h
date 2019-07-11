@@ -32,7 +32,7 @@ class XWalkURLRequestJobFactory : public net::URLRequestJobFactory {
                           std::unique_ptr<ProtocolHandler> protocol_handler);
 
   // net::URLRequestJobFactory implementation.
-  virtual net::URLRequestJob* MaybeCreateJobWithProtocolHandler(
+  net::URLRequestJob* MaybeCreateJobWithProtocolHandler(
       const std::string& scheme,
       net::URLRequest* request,
       net::NetworkDelegate* network_delegate) const override;
@@ -47,7 +47,6 @@ class XWalkURLRequestJobFactory : public net::URLRequestJobFactory {
       net::NetworkDelegate* network_delegate) const override;
 
   bool IsHandledProtocol(const std::string& scheme) const override;
-  bool IsHandledURL(const GURL& url) const override;
   bool IsSafeRedirectTarget(const GURL& location) const override;
 
  private:

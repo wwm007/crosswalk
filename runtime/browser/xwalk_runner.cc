@@ -107,6 +107,10 @@ void XWalkRunner::DestroyComponents() {
   // The ScopedVector takes care of deleting all the components. Ensure that
   // components are deleted before their dependencies by reversing the order.
   std::reverse(components_.begin(), components_.end());
+
+  for (XWalkComponent* item : components_)
+    delete item;
+
   components_.clear();
 
   app_component_ = NULL;
@@ -136,7 +140,7 @@ void XWalkRunner::InitializeRuntimeVariablesForExtensions(
 
   if (app)
     (*variables)["app_id"] =
-        base::WrapUnique(new base::StringValue(app->id()));
+        base::WrapUnique(new base::Value(app->id()));
 }
 
 void XWalkRunner::OnRenderProcessWillLaunch(content::RenderProcessHost* host) {
@@ -146,7 +150,7 @@ void XWalkRunner::OnRenderProcessWillLaunch(content::RenderProcessHost* host) {
   std::vector<extensions::XWalkExtension*> ui_thread_extensions;
   std::vector<extensions::XWalkExtension*> extension_thread_extensions;
 
-  ScopedVector<XWalkComponent>::iterator it = components_.begin();
+  auto it = components_.begin();
   for (; it != components_.end(); ++it) {
     XWalkComponent* component = *it;
     component->CreateUIThreadExtensions(host, &ui_thread_extensions);

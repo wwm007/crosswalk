@@ -127,10 +127,11 @@ void TCPServerSocketObject::OnAccept(int status) {
 
     std::unique_ptr<base::ListValue> dataList(new base::ListValue);
     dataList->AppendString(object_id);
-    dataList->Append(options.ToValue().release());
+    // std::move moving a temporary object prevents copy elision [-Werror,-Wpessimizing-move]
+    dataList->Append(options.ToValue());
 
     std::unique_ptr<base::ListValue> eventData(new base::ListValue);
-    eventData->Append(dataList.release());
+    eventData->Append(std::move(dataList));
 
     DispatchEvent("connect", std::move(eventData));
   } else {

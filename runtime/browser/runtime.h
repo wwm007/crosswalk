@@ -26,6 +26,7 @@ struct FileChooserParams;
 class RenderProcessHost;
 class SiteInstance;
 class WebContents;
+enum class KeyboardEventProcessingResult;
 }
 
 namespace xwalk {
@@ -135,10 +136,9 @@ class Runtime : public content::WebContentsDelegate,
       content::WebContents* contents) override;
   void ActivateContents(content::WebContents* contents) override;
   bool CanOverscrollContent() const override;
-  bool PreHandleKeyboardEvent(
+  content::KeyboardEventProcessingResult PreHandleKeyboardEvent(
       content::WebContents* source,
-      const content::NativeWebKeyboardEvent& event,
-      bool* is_keyboard_shortcut) override;
+      const content::NativeWebKeyboardEvent& event) override;
   void HandleKeyboardEvent(
       content::WebContents* source,
       const content::NativeWebKeyboardEvent& event) override;
@@ -161,11 +161,12 @@ class Runtime : public content::WebContentsDelegate,
                                   content::MediaStreamType type) override;
   void LoadProgressChanged(content::WebContents* source,
                            double progress) override;
+  void SetOverlayMode(bool useOverlayMode) override;
 
   // Overridden from content::WebContentsObserver.
   void DidUpdateFaviconURL(
       const std::vector<content::FaviconURL>& candidates) override;
-  void TitleWasSet(content::NavigationEntry* entry, bool explicit_set) override;
+  void TitleWasSet(content::NavigationEntry* entry) override;
   void DidFinishNavigation(content::NavigationHandle* navigation_handle) override;
 
   // Callback method for WebContents::DownloadImage.
