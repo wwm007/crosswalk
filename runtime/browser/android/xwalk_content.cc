@@ -87,7 +87,7 @@ namespace keys = xwalk::application_manifest_keys;
 namespace xwalk {
 
 namespace {
-const int cBlkSize = 4 * 1024;
+//const int cBlkSize = 4 * 1024;
 
 const void* kXWalkContentUserDataKey = &kXWalkContentUserDataKey;
 

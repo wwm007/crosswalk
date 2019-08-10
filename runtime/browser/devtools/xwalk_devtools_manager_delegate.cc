@@ -384,7 +384,7 @@ scoped_refptr<content::DevToolsAgentHost> XWalkDevToolsManagerDelegate::CreateNe
 
 content::DevToolsAgentHost::List XWalkDevToolsManagerDelegate::RemoteDebuggingTargets() {
   // Enumerate existing tabs, including the ones with no WebContents.
-  DevToolsAgentHost::List result;
+  content::DevToolsAgentHost::List result;
 
 #ifdef TENTA_CHROMIUM_BUILD
   std::set<WebContents*> tab_web_contents;
@@ -462,7 +462,7 @@ bool XWalkDevToolsManagerDelegate::IsBrowserTargetDiscoverable() {
 }
 
 bool XWalkDevToolsManagerDelegate::HandleCommand(
-    DevToolsAgentHost* agent_host,
+    content::DevToolsAgentHost* agent_host,
     int session_id,
     base::DictionaryValue* command_dict) {
   /*
